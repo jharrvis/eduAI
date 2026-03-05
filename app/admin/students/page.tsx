@@ -1,87 +1,489 @@
-"use client";
+﻿"use client";
 
-import { useStore } from "@/store/useStore";
-import { motion } from "motion/react";
-import { Users, BookOpen, CheckCircle } from "lucide-react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import {
+  bulkCreateStudents,
+  createStudent,
+  createUser,
+  deleteUser,
+  getUsers,
+  type UserWithProfile,
+  updateUser,
+} from "@/app/actions/users";
+import {
+  ChevronLeft,
+  ChevronRight,
+  FileUp,
+  Loader2,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
 
-export default function AdminStudents() {
-  const { users, classes, assignments } = useStore();
-  const students = users.filter((u) => u.role === "student");
+type UserRole = "ADMIN" | "TEACHER" | "STUDENT";
+
+type FormState = {
+  role: UserRole;
+  name: string;
+  email: string;
+  password: string;
+  nim: string;
+  major: string;
+};
+
+const PAGE_SIZE = 10;
+
+export default function AdminUsersPage() {
+  const [users, setUsers] = useState<UserWithProfile[]>([]);
+  const [roleFilter, setRoleFilter] = useState<"ALL" | UserRole>("ALL");
+  const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [bulkError, setBulkError] = useState<string | null>(null);
+  const [bulkText, setBulkText] = useState("");
+  const [isPending, startTransition] = useTransition();
+
+  const [form, setForm] = useState<FormState>({
+    role: "STUDENT",
+    name: "",
+    email: "",
+    password: "",
+    nim: "",
+    major: "",
+  });
+
+  const loadUsers = () => {
+    startTransition(async () => {
+      try {
+        const rows = await getUsers();
+        setUsers(rows);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Gagal memuat data user.");
+      }
+    });
+  };
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const filteredUsers = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+
+    return users.filter((item) => {
+      if (roleFilter !== "ALL" && item.role !== roleFilter) {
+        return false;
+      }
+      if (!keyword) return true;
+
+      return (
+        item.name.toLowerCase().includes(keyword) ||
+        item.email.toLowerCase().includes(keyword) ||
+        (item.nim || "").toLowerCase().includes(keyword) ||
+        (item.major || "").toLowerCase().includes(keyword) ||
+        (item.role || "").toLowerCase().includes(keyword)
+      );
+    });
+  }, [users, roleFilter, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const rows = filteredUsers.slice(
+    (safeCurrentPage - 1) * PAGE_SIZE,
+    safeCurrentPage * PAGE_SIZE,
+  );
+
+  const openAddModal = () => {
+    setEditingId(null);
+    setError(null);
+    setForm({
+      role: "STUDENT",
+      name: "",
+      email: "",
+      password: "",
+      nim: "",
+      major: "",
+    });
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (userId: string) => {
+    const row = users.find((item) => item.id === userId);
+    if (!row) return;
+
+    setEditingId(userId);
+    setError(null);
+    setForm({
+      role: (row.role || "STUDENT") as UserRole,
+      name: row.name,
+      email: row.email,
+      password: "",
+      nim: row.nim || "",
+      major: row.major || "",
+    });
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingId(null);
+    setError(null);
+  };
+
+  const openBulkModal = () => {
+    setBulkError(null);
+    setBulkText("");
+    setIsBulkModalOpen(true);
+  };
+
+  const closeBulkModal = () => {
+    setBulkError(null);
+    setBulkText("");
+    setIsBulkModalOpen(false);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    const role = form.role;
+    const name = form.name.trim();
+    const email = form.email.trim();
+    const password = form.password.trim();
+    const nim = form.nim.trim();
+    const major = form.major.trim();
+
+    if (!name) {
+      setError("Nama wajib diisi.");
+      return;
+    }
+
+    if (role === "STUDENT" && !nim) {
+      setError("NIM wajib diisi untuk student.");
+      return;
+    }
+
+    if (!editingId && role !== "STUDENT") {
+      if (!email || !password) {
+        setError("Email dan password wajib diisi untuk ADMIN/TEACHER.");
+        return;
+      }
+    }
+
+    if (!editingId && role === "STUDENT") {
+      startTransition(async () => {
+        try {
+          await createStudent({
+            nim,
+            name,
+            major: major || undefined,
+          });
+          closeModal();
+          setCurrentPage(1);
+          await loadUsers();
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Gagal menambah student.");
+        }
+      });
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        if (editingId) {
+          await updateUser(editingId, {
+            role,
+            name,
+            email: role === "STUDENT" ? undefined : email,
+            nim: role === "STUDENT" ? nim : undefined,
+            major: role === "STUDENT" ? major || undefined : undefined,
+          });
+        } else {
+          await createUser({
+            role,
+            name,
+            email,
+            password,
+            nim: role === "STUDENT" ? nim : undefined,
+            major: role === "STUDENT" ? major || undefined : undefined,
+          });
+        }
+
+        closeModal();
+        setCurrentPage(1);
+        await loadUsers();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Gagal menyimpan user.");
+      }
+    });
+  };
+
+  const handleBulkSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setBulkError(null);
+
+    try {
+      const lines = bulkText
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      if (lines.length === 0) {
+        setBulkError("Data import kosong.");
+        return;
+      }
+
+      const parsed = lines.map((line, index) => {
+        const row = line.split(",").map((value) => value.trim());
+        const [nim, name, major] = row;
+
+        if (!nim || !name) {
+          throw new Error(`Baris ${index + 1}: format harus 'nim,nama,jurusan'.`);
+        }
+
+        return {
+          nim,
+          name,
+          major: major || undefined,
+        };
+      });
+
+      startTransition(async () => {
+        try {
+          await bulkCreateStudents(parsed);
+          closeBulkModal();
+          setCurrentPage(1);
+          await loadUsers();
+        } catch (err) {
+          setBulkError(err instanceof Error ? err.message : "Bulk insert gagal.");
+        }
+      });
+    } catch (err) {
+      setBulkError(err instanceof Error ? err.message : "Bulk insert gagal.");
+    }
+  };
 
   return (
-    <div className="space-y-8">
-      <header>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-          Students
-        </h1>
-        <p className="text-slate-500 mt-2">
-          Manage enrolled students and view their progress.
-        </p>
+    <div className="space-y-6">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">User Management</h1>
+          <p className="mt-1 text-slate-500 dark:text-slate-400">Kelola user role ADMIN, TEACHER, dan STUDENT. Password default student: <span className="font-semibold">Student12345!</span></p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={openBulkModal} className="app-btn-ghost" disabled={isPending}>
+            <FileUp className="h-5 w-5" />
+            Bulk Student
+          </button>
+          <button type="button" onClick={openAddModal} className="app-btn-primary" disabled={isPending}>
+            <Plus className="h-5 w-5" />
+            Add User
+          </button>
+        </div>
       </header>
 
-      <div className="grid grid-cols-1 gap-6">
-        {students.map((student) => {
-          const enrolledClasses = classes.filter((c) =>
-            c.students.includes(student.id),
-          );
-          const studentAssignments = assignments.filter(
-            (a) => a.studentId === student.id,
-          );
-
-          return (
-            <motion.div
-              key={student.id}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-6 items-start md:items-center justify-between"
+      <div className="app-card p-4 sm:p-6">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex w-full flex-col gap-2 sm:max-w-xl sm:flex-row">
+            <div className="relative w-full">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="Cari nama/email/NIM/role"
+                className="app-input pl-9"
+              />
+            </div>
+            <select
+              value={roleFilter}
+              onChange={(e) => {
+                setRoleFilter(e.target.value as "ALL" | UserRole);
+                setCurrentPage(1);
+              }}
+              className="app-input w-full sm:w-40"
             >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-xl">
-                  {student.name.charAt(0)}
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-slate-900">
-                    {student.name}
-                  </h3>
-                  <p className="text-sm text-slate-500">ID: {student.id}</p>
-                </div>
-              </div>
+              <option value="ALL">All Roles</option>
+              <option value="ADMIN">ADMIN</option>
+              <option value="TEACHER">TEACHER</option>
+              <option value="STUDENT">STUDENT</option>
+            </select>
+          </div>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Total: <span className="font-semibold">{filteredUsers.length}</span> user
+          </p>
+        </div>
 
-              <div className="flex gap-6 w-full md:w-auto">
-                <div className="flex-1 md:flex-none text-center bg-slate-50 p-3 rounded-xl border border-slate-100">
-                  <BookOpen className="w-5 h-5 text-indigo-500 mx-auto mb-1" />
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Classes
-                  </p>
-                  <p className="text-lg font-bold text-slate-900">
-                    {enrolledClasses.length}
-                  </p>
-                </div>
-                <div className="flex-1 md:flex-none text-center bg-slate-50 p-3 rounded-xl border border-slate-100">
-                  <CheckCircle className="w-5 h-5 text-emerald-500 mx-auto mb-1" />
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Assignments
-                  </p>
-                  <p className="text-lg font-bold text-slate-900">
-                    {studentAssignments.length}
-                  </p>
-                </div>
-              </div>
-            </motion.div>
-          );
-        })}
-        {students.length === 0 && (
-          <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 border-dashed">
-            <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <h3 className="text-lg font-medium text-slate-900">
-              No students found
-            </h3>
-            <p className="text-slate-500 mt-1">
-              There are currently no students registered.
-            </p>
+        <div className="overflow-x-auto">
+          <table className="min-w-full border-separate border-spacing-y-2">
+            <thead>
+              <tr className="text-left text-sm text-slate-500 dark:text-slate-400">
+                <th className="px-3 py-2 font-medium">Name</th>
+                <th className="px-3 py-2 font-medium">Email</th>
+                <th className="px-3 py-2 font-medium">Role</th>
+                <th className="px-3 py-2 font-medium">NIM</th>
+                <th className="px-3 py-2 font-medium">Major</th>
+                <th className="px-3 py-2 font-medium text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((item) => (
+                <tr key={item.id} className="rounded-xl bg-slate-50 text-sm text-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                  <td className="rounded-l-xl px-3 py-3 font-medium">{item.name}</td>
+                  <td className="px-3 py-3">{item.email}</td>
+                  <td className="px-3 py-3">{item.role || "-"}</td>
+                  <td className="px-3 py-3">{item.nim || "-"}</td>
+                  <td className="px-3 py-3">{item.major || "-"}</td>
+                  <td className="rounded-r-xl px-3 py-3">
+                    <div className="flex justify-end gap-2">
+                      <button type="button" onClick={() => openEditModal(item.id)} className="rounded-lg p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!window.confirm(`Hapus ${item.name}?`)) return;
+                          startTransition(async () => {
+                            try {
+                              await deleteUser(item.id);
+                              await loadUsers();
+                            } catch (err) {
+                              setError(err instanceof Error ? err.message : "Gagal menghapus user.");
+                            }
+                          });
+                        }}
+                        className="rounded-lg p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {(rows.length === 0 || isPending) && (
+          <div className="rounded-xl border border-dashed border-slate-200 py-10 text-center text-slate-500 dark:border-slate-700 dark:text-slate-400">
+            {isPending ? (
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Memuat data...
+              </span>
+            ) : (
+              "Data user tidak ditemukan."
+            )}
           </div>
         )}
+
+        <div className="mt-4 flex items-center justify-between">
+          <p className="text-xs text-slate-500 dark:text-slate-400">Page {safeCurrentPage} of {totalPages}</p>
+          <div className="flex items-center gap-2">
+            <button type="button" disabled={safeCurrentPage === 1 || isPending} onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))} className="app-btn-ghost px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"><ChevronLeft className="h-4 w-4" /></button>
+            <button type="button" disabled={safeCurrentPage === totalPages || isPending} onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))} className="app-btn-ghost px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"><ChevronRight className="h-4 w-4" /></button>
+          </div>
+        </div>
       </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="app-card w-full max-w-xl p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{editingId ? "Edit User" : "Add User"}</h2>
+              <button type="button" onClick={closeModal} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700" aria-label="Close modal"><X className="h-4 w-4" /></button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Role</label>
+                <select value={form.role} onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value as UserRole }))} className="app-input" required>
+                  <option value="ADMIN">ADMIN</option>
+                  <option value="TEACHER">TEACHER</option>
+                  <option value="STUDENT">STUDENT</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Nama</label>
+                <input type="text" value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} className="app-input" required />
+              </div>
+
+              {form.role !== "STUDENT" && (
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Email</label>
+                  <input type="email" value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} className="app-input" required={!editingId} />
+                </div>
+              )}
+
+              {!editingId && form.role !== "STUDENT" && (
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Password</label>
+                  <input type="password" minLength={8} value={form.password} onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))} className="app-input" required />
+                </div>
+              )}
+
+              {form.role === "STUDENT" && (
+                <>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">NIM</label>
+                    <input type="text" value={form.nim} onChange={(e) => setForm((prev) => ({ ...prev, nim: e.target.value }))} className="app-input" required />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Jurusan (Optional)</label>
+                    <input type="text" value={form.major} onChange={(e) => setForm((prev) => ({ ...prev, major: e.target.value }))} className="app-input" />
+                  </div>
+                </>
+              )}
+
+              {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">{error}</p>}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={closeModal} className="app-btn-ghost" disabled={isPending}>Cancel</button>
+                <button type="submit" className="app-btn-primary" disabled={isPending}>{isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{editingId ? "Update" : "Save"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isBulkModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="app-card w-full max-w-2xl p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Bulk Insert Students</h2>
+              <button type="button" onClick={closeBulkModal} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700" aria-label="Close modal"><X className="h-4 w-4" /></button>
+            </div>
+
+            <form onSubmit={handleBulkSubmit} className="space-y-4">
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700 dark:border-blue-900/40 dark:bg-blue-900/20 dark:text-blue-300">
+                Format per baris: <span className="font-semibold">nim,nama,jurusan</span>
+                <br />
+                Contoh: <span className="font-mono">2301003,Budi Santoso,Teknik Informatika</span>
+              </div>
+
+              <textarea rows={10} value={bulkText} onChange={(e) => setBulkText(e.target.value)} className="app-input resize-y" placeholder={"2301003,Budi Santoso,Teknik Informatika\n2301004,Rina Putri,"} />
+
+              {bulkError && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">{bulkError}</p>}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={closeBulkModal} className="app-btn-ghost" disabled={isPending}>Cancel</button>
+                <button type="submit" className="app-btn-primary" disabled={isPending}>{isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Insert Bulk</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

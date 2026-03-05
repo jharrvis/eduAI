@@ -1,353 +1,232 @@
-"use client";
+﻿"use client";
 
-import { useState } from "react";
-import { useStore, Material } from "@/store/useStore";
-import { motion } from "motion/react";
-import {
-  Plus,
-  Edit,
-  Trash,
-  Sparkles,
-  Loader2,
-  FileText,
-  HelpCircle,
-  BookOpen,
-} from "lucide-react";
-import { GoogleGenAI, Type } from "@google/genai";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { getClasses } from "@/app/actions/classes";
+import { createMaterial, deleteMaterial, getMaterials, updateMaterial } from "@/app/actions/materials";
+import FileUpload from "@/app/components/file-upload";
+import { Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 
-export default function AdminMaterials() {
-  const { materials, classes, addMaterial, updateMaterial } = useStore();
-  const [isCreating, setIsCreating] = useState(false);
+type ClassItem = { id: string; name: string };
+type MaterialItem = {
+  id: string;
+  classId: string;
+  className: string;
+  title: string;
+  content: string | null;
+  fileUrl: string | null;
+  scheduledAt: Date;
+};
+
+type MaterialForm = {
+  classId: string;
+  title: string;
+  content: string;
+  fileUrl: string;
+  scheduledAt: string;
+};
+
+function toLocalInputValue(date: Date) {
+  const d = new Date(date);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+}
+
+export default function AdminMaterialsPage() {
+  const [classes, setClasses] = useState<ClassItem[]>([]);
+  const [rows, setRows] = useState<MaterialItem[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-
-  const [formData, setFormData] = useState({
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const [form, setForm] = useState<MaterialForm>({
     classId: "",
     title: "",
     content: "",
+    fileUrl: "",
+    scheduledAt: "",
   });
 
-  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
-  const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
+  const grouped = useMemo(() => {
+    return rows.reduce<Record<string, MaterialItem[]>>((acc, item) => {
+      if (!acc[item.className]) acc[item.className] = [];
+      acc[item.className].push(item);
+      return acc;
+    }, {});
+  }, [rows]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingId) {
-      updateMaterial(editingId, formData);
-      setEditingId(null);
-    } else {
-      addMaterial({
-        id: `m${Date.now()}`,
-        ...formData,
-      });
-    }
-    setIsCreating(false);
-    setFormData({ classId: "", title: "", content: "" });
-  };
-
-  const handleEdit = (material: Material) => {
-    setFormData({
-      classId: material.classId,
-      title: material.title,
-      content: material.content,
+  const loadData = () => {
+    startTransition(async () => {
+      try {
+        const [classRows, materialRows] = await Promise.all([getClasses(), getMaterials()]);
+        setClasses(classRows.map((item) => ({ id: item.id, name: item.name })));
+        setRows(materialRows as MaterialItem[]);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Gagal memuat data materi.");
+      }
     });
-    setEditingId(material.id);
-    setIsCreating(true);
   };
 
-  const generateSummary = async (material: Material) => {
-    setIsGeneratingSummary(true);
-    try {
-      const ai = new GoogleGenAI({
-        apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY,
-      });
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `Buatkan ringkasan singkat dan padat dari materi berikut:\n\n${material.content}`,
-      });
+  useEffect(() => {
+    loadData();
+  }, []);
 
-      updateMaterial(material.id, { summary: response.text });
-    } catch (error) {
-      console.error("Failed to generate summary:", error);
-      alert("Gagal membuat ringkasan.");
-    } finally {
-      setIsGeneratingSummary(false);
-    }
+  const openCreate = () => {
+    setEditingId(null);
+    setError(null);
+    setForm({ classId: classes[0]?.id || "", title: "", content: "", fileUrl: "", scheduledAt: "" });
+    setIsModalOpen(true);
   };
 
-  const generateQuiz = async (material: Material) => {
-    setIsGeneratingQuiz(true);
-    try {
-      const ai = new GoogleGenAI({
-        apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY,
-      });
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `Buatkan 3 soal pilihan ganda berdasarkan materi berikut:\n\n${material.content}`,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                question: { type: Type.STRING, description: "Pertanyaan kuis" },
-                options: {
-                  type: Type.ARRAY,
-                  items: { type: Type.STRING },
-                  description: "4 pilihan jawaban",
-                },
-                answer: {
-                  type: Type.STRING,
-                  description:
-                    "Jawaban yang benar (harus sama persis dengan salah satu opsi)",
-                },
-              },
-              required: ["question", "options", "answer"],
-            },
-          },
-        },
-      });
+  const openEdit = (item: MaterialItem) => {
+    setEditingId(item.id);
+    setError(null);
+    setForm({
+      classId: item.classId,
+      title: item.title,
+      content: item.content || "",
+      fileUrl: item.fileUrl || "",
+      scheduledAt: toLocalInputValue(item.scheduledAt),
+    });
+    setIsModalOpen(true);
+  };
 
-      const quizData = JSON.parse(response.text || "[]");
-      updateMaterial(material.id, { quiz: quizData });
-    } catch (error) {
-      console.error("Failed to generate quiz:", error);
-      alert("Gagal membuat kuis.");
-    } finally {
-      setIsGeneratingQuiz(false);
+  const saveMaterial = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.classId || !form.title.trim() || !form.scheduledAt) {
+      setError("Class, title, dan schedule wajib diisi.");
+      return;
     }
+
+    startTransition(async () => {
+      try {
+        if (editingId) {
+          await updateMaterial(editingId, {
+            title: form.title,
+            content: form.content,
+            fileUrl: form.fileUrl,
+            scheduledAt: form.scheduledAt,
+          });
+        } else {
+          await createMaterial({
+            classId: form.classId,
+            title: form.title,
+            content: form.content,
+            fileUrl: form.fileUrl,
+            scheduledAt: form.scheduledAt,
+          });
+        }
+
+        setIsModalOpen(false);
+        await loadData();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Gagal menyimpan materi.");
+      }
+    });
   };
 
   return (
-    <div className="space-y-8">
-      <header className="flex justify-between items-center">
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-            Materials
-          </h1>
-          <p className="text-slate-500 mt-2">
-            Manage course materials and generate AI content.
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Materials</h1>
+          <p className="mt-1 text-slate-500 dark:text-slate-400">Kelola materi dan jadwal tayang (`scheduledAt`).</p>
         </div>
-        <button
-          onClick={() => {
-            setIsCreating(true);
-            setEditingId(null);
-            setFormData({ classId: "", title: "", content: "" });
-          }}
-          className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors font-medium shadow-sm"
-        >
-          <Plus className="w-5 h-5" />
+        <button type="button" onClick={openCreate} className="app-btn-primary" disabled={isPending}>
+          <Plus className="h-5 w-5" />
           Add Material
         </button>
       </header>
 
-      {isCreating && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"
-        >
-          <h2 className="text-xl font-semibold mb-4">
-            {editingId ? "Edit Material" : "Create New Material"}
-          </h2>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Class
-              </label>
-              <select
-                required
-                value={formData.classId}
-                onChange={(e) =>
-                  setFormData({ ...formData, classId: e.target.value })
-                }
-                className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-              >
-                <option value="" disabled>
-                  Select a class
-                </option>
-                {classes.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Title
-              </label>
-              <input
-                required
-                type="text"
-                value={formData.title}
-                onChange={(e) =>
-                  setFormData({ ...formData, title: e.target.value })
-                }
-                className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                placeholder="e.g. Introduction to React"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Content
-              </label>
-              <textarea
-                required
-                rows={6}
-                value={formData.content}
-                onChange={(e) =>
-                  setFormData({ ...formData, content: e.target.value })
-                }
-                className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                placeholder="Write your material content here..."
-              />
-            </div>
-            <div className="flex justify-end gap-3 pt-4">
-              <button
-                type="button"
-                onClick={() => setIsCreating(false)}
-                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-medium transition-colors"
-              >
-                Save Material
-              </button>
-            </div>
-          </form>
-        </motion.div>
-      )}
+      {error && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">{error}</div>}
 
-      <div className="grid grid-cols-1 gap-6">
-        {materials.map((material) => {
-          const cls = classes.find((c) => c.id === material.classId);
-          return (
-            <motion.div
-              key={material.id}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"
-            >
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-xl font-bold text-slate-900">
-                    {material.title}
-                  </h3>
-                  <p className="text-sm text-indigo-600 font-medium mt-1">
-                    {cls?.name}
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleEdit(material)}
-                  className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                >
-                  <Edit className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="prose prose-slate max-w-none mb-6">
-                <p className="text-slate-600 line-clamp-3">
-                  {material.content}
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-4 pt-4 border-t border-slate-100">
-                <div className="flex-1 min-w-[300px]">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-semibold text-slate-900 flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-emerald-500" />
-                      AI Summary
-                    </h4>
-                    {!material.summary && (
-                      <button
-                        onClick={() => generateSummary(material)}
-                        disabled={isGeneratingSummary}
-                        className="text-xs flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-1 rounded-md hover:bg-emerald-100 transition-colors disabled:opacity-50"
-                      >
-                        {isGeneratingSummary ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <Sparkles className="w-3 h-3" />
-                        )}
-                        Generate
-                      </button>
-                    )}
-                  </div>
-                  {material.summary ? (
-                    <p className="text-sm text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                      {material.summary}
-                    </p>
-                  ) : (
-                    <p className="text-sm text-slate-400 italic">
-                      No summary generated yet.
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex-1 min-w-[300px]">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-semibold text-slate-900 flex items-center gap-2">
-                      <HelpCircle className="w-4 h-4 text-amber-500" />
-                      AI Quiz ({material.quiz?.length || 0} questions)
-                    </h4>
-                    {!material.quiz && (
-                      <button
-                        onClick={() => generateQuiz(material)}
-                        disabled={isGeneratingQuiz}
-                        className="text-xs flex items-center gap-1 bg-amber-50 text-amber-700 px-2 py-1 rounded-md hover:bg-amber-100 transition-colors disabled:opacity-50"
-                      >
-                        {isGeneratingQuiz ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <Sparkles className="w-3 h-3" />
-                        )}
-                        Generate
-                      </button>
-                    )}
-                  </div>
-                  {material.quiz ? (
-                    <div className="space-y-2">
-                      {material.quiz.map((q, i) => (
-                        <div
-                          key={i}
-                          className="text-sm bg-slate-50 p-3 rounded-xl border border-slate-100"
-                        >
-                          <p className="font-medium text-slate-800 mb-1">
-                            {i + 1}. {q.question}
-                          </p>
-                          <p className="text-slate-500 text-xs">
-                            Answer: {q.answer}
-                          </p>
-                        </div>
-                      ))}
+      <div className="space-y-4">
+        {Object.entries(grouped).map(([className, materials]) => (
+          <div key={className} className="app-card p-5">
+            <h2 className="mb-3 text-lg font-semibold text-slate-900 dark:text-slate-100">{className}</h2>
+            <div className="space-y-3">
+              {materials.map((item) => (
+                <div key={item.id} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold text-slate-900 dark:text-slate-100">{item.title}</h3>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Tayang: {new Date(item.scheduledAt).toLocaleString()}</p>
+                      {item.fileUrl && <p className="mt-1 text-sm text-blue-600 dark:text-blue-400">File: {item.fileUrl}</p>}
                     </div>
-                  ) : (
-                    <p className="text-sm text-slate-400 italic">
-                      No quiz generated yet.
-                    </p>
-                  )}
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => openEdit(item)} className="rounded-lg p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"><Pencil className="h-4 w-4" /></button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!window.confirm(`Hapus materi '${item.title}'?`)) return;
+                          startTransition(async () => {
+                            await deleteMaterial(item.id);
+                            await loadData();
+                          });
+                        }}
+                        className="rounded-lg p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          );
-        })}
-        {materials.length === 0 && !isCreating && (
-          <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 border-dashed">
-            <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <h3 className="text-lg font-medium text-slate-900">
-              No materials yet
-            </h3>
-            <p className="text-slate-500 mt-1">
-              Get started by creating your first course material.
-            </p>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        {rows.length === 0 && (
+          <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-500 dark:border-slate-700 dark:text-slate-400">
+            {isPending ? <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Memuat materi...</span> : "Belum ada materi."}
           </div>
         )}
       </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="app-card w-full max-w-xl p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{editingId ? "Edit Material" : "Add Material"}</h2>
+              <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"><X className="h-4 w-4" /></button>
+            </div>
+
+            <form onSubmit={saveMaterial} className="space-y-4">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Class</label>
+                <select className="app-input" value={form.classId} onChange={(e) => setForm((prev) => ({ ...prev, classId: e.target.value }))} required>
+                  <option value="" disabled>Pilih class</option>
+                  {classes.map((item) => (<option key={item.id} value={item.id}>{item.name}</option>))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Title</label>
+                <input className="app-input" value={form.title} onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))} required />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Content</label>
+                <textarea rows={5} className="app-input" value={form.content} onChange={(e) => setForm((prev) => ({ ...prev, content: e.target.value }))} />
+              </div>
+              <FileUpload
+                label="Lampiran Materi (Optional)"
+                scope="materials"
+                value={form.fileUrl}
+                onChange={(fileUrl) => setForm((prev) => ({ ...prev, fileUrl }))}
+                disabled={isPending}
+              />
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Scheduled At</label>
+                <input type="datetime-local" className="app-input" value={form.scheduledAt} onChange={(e) => setForm((prev) => ({ ...prev, scheduledAt: e.target.value }))} required />
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button type="button" className="app-btn-ghost" onClick={() => setIsModalOpen(false)}>Cancel</button>
+                <button type="submit" className="app-btn-primary" disabled={isPending}>{isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{editingId ? "Update" : "Save"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

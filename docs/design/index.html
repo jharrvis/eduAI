@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LMS Dashboard - Modern UI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
+
+        .sidebar-transition { transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    </style>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd', 
+                            400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors duration-200">
+
+    <!-- Wrapper -->
+    <div class="flex h-screen overflow-hidden">
+        
+        <!-- Sidebar -->
+        <aside id="sidebar" class="sidebar-transition relative z-40 flex flex-col w-64 h-screen bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700">
+            <!-- Logo Section -->
+            <div class="flex items-center justify-between h-16 px-4 border-b border-slate-200 dark:border-slate-700">
+                <div class="flex items-center gap-3">
+                    <div class="bg-primary-600 p-2 rounded-lg text-white">
+                        <i data-lucide="graduation-cap"></i>
+                    </div>
+                    <span id="logo-text" class="font-bold text-xl tracking-tight">EduFlow</span>
+                </div>
+            </div>
+
+            <!-- Navigation Links -->
+            <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+                <a href="#" class="flex items-center px-3 py-2 text-primary-600 bg-primary-50 dark:bg-primary-900/20 rounded-lg group">
+                    <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                    <span class="ml-3 nav-text">Dashboard</span>
+                </a>
+                <a href="#" class="flex items-center px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-lg group transition-colors">
+                    <i data-lucide="book-open" class="w-5 h-5"></i>
+                    <span class="ml-3 nav-text">Kursus Saya</span>
+                </a>
+                <a href="#" class="flex items-center px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-lg group transition-colors">
+                    <i data-lucide="calendar" class="w-5 h-5"></i>
+                    <span class="ml-3 nav-text">Jadwal</span>
+                </a>
+                <a href="#" class="flex items-center px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-lg group transition-colors">
+                    <i data-lucide="message-square" class="w-5 h-5"></i>
+                    <span class="ml-3 nav-text">Diskusi</span>
+                </a>
+                <a href="#" class="flex items-center px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-lg group transition-colors">
+                    <i data-lucide="award" class="w-5 h-5"></i>
+                    <span class="ml-3 nav-text">Sertifikat</span>
+                </a>
+            </nav>
+
+            <!-- Bottom Actions -->
+            <div class="p-4 border-t border-slate-200 dark:border-slate-700">
+                <a href="#" class="flex items-center px-3 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-lg group transition-colors">
+                    <i data-lucide="settings" class="w-5 h-5"></i>
+                    <span class="ml-3 nav-text">Pengaturan</span>
+                </a>
+                <button onclick="toggleSidebar()" class="mt-2 w-full flex items-center px-3 py-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                    <i data-lucide="chevron-left" id="collapse-icon"></i>
+                    <span class="ml-3 nav-text">Sembunyikan</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
+            
+            <!-- Top Header -->
+            <header class="h-16 flex items-center justify-between px-6 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 z-30">
+                <div class="flex items-center gap-4">
+                    <button class="md:hidden p-2 text-slate-600" onclick="toggleSidebarMobile()">
+                        <i data-lucide="menu"></i>
+                    </button>
+                    <h1 class="text-lg font-semibold hidden sm:block">Halo, Budi 👋</h1>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <!-- Search -->
+                    <div class="relative hidden lg:block">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                            <i data-lucide="search" class="w-4 h-4"></i>
+                        </span>
+                        <input type="text" placeholder="Cari kursus..." class="pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 w-64">
+                    </div>
+
+                    <!-- Theme Toggle -->
+                    <button onclick="toggleTheme()" class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500">
+                        <i data-lucide="sun" id="sun-icon" class="hidden"></i>
+                        <i data-lucide="moon" id="moon-icon"></i>
+                    </button>
+
+                    <!-- Notifications -->
+                    <button class="relative p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500">
+                        <i data-lucide="bell" class="w-6 h-6"></i>
+                        <span class="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-slate-800"></span>
+                    </button>
+
+                    <!-- Profile -->
+                    <div class="flex items-center gap-2 border-l border-slate-200 dark:border-slate-700 pl-4">
+                        <div class="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold overflow-hidden">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Budi" alt="Avatar">
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Scrollable Content -->
+            <div class="flex-1 overflow-y-auto p-6 space-y-8">
+                
+                <!-- Welcome Banner -->
+                <div class="relative overflow-hidden rounded-2xl bg-primary-600 p-8 text-white shadow-lg">
+                    <div class="relative z-10 max-w-lg">
+                        <h2 class="text-3xl font-bold mb-2">Lanjutkan Belajar Anda!</h2>
+                        <p class="text-primary-100 mb-6">Anda telah menyelesaikan 75% dari kursus "UI/UX Design Masterclass". Selesaikan hari ini untuk mendapatkan sertifikat!</p>
+                        <button class="px-6 py-2 bg-white text-primary-600 font-semibold rounded-lg hover:bg-primary-50 transition-colors">
+                            Lanjutkan Belajar
+                        </button>
+                    </div>
+                    <!-- Decorative Circle -->
+                    <div class="absolute -right-10 -top-10 w-64 h-64 bg-primary-500/30 rounded-full blur-3xl"></div>
+                </div>
+
+                <!-- Stats Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
+                        <div class="p-3 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-lg">
+                            <i data-lucide="book" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-slate-500">Kursus Aktif</p>
+                            <p class="text-xl font-bold text-slate-800 dark:text-slate-100">12</p>
+                        </div>
+                    </div>
+                    <div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
+                        <div class="p-3 bg-green-100 dark:bg-green-900/30 text-green-600 rounded-lg">
+                            <i data-lucide="check-circle" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-slate-500">Selesai</p>
+                            <p class="text-xl font-bold text-slate-800 dark:text-slate-100">45</p>
+                        </div>
+                    </div>
+                    <div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
+                        <div class="p-3 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 rounded-lg">
+                            <i data-lucide="clock" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-slate-500">Jam Belajar</p>
+                            <p class="text-xl font-bold text-slate-800 dark:text-slate-100">128j</p>
+                        </div>
+                    </div>
+                    <div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
+                        <div class="p-3 bg-purple-100 dark:bg-purple-900/30 text-purple-600 rounded-lg">
+                            <i data-lucide="star" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-slate-500">Poin XP</p>
+                            <p class="text-xl font-bold text-slate-800 dark:text-slate-100">2,450</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Grid: Courses & Sidebar Activity -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    
+                    <!-- Left Column: Courses -->
+                    <div class="lg:col-span-2 space-y-6">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-lg font-bold">Kursus Sedang Berjalan</h3>
+                            <a href="#" class="text-sm text-primary-600 font-medium hover:underline">Lihat Semua</a>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <!-- Course Card 1 -->
+                            <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                                <div class="h-32 bg-slate-200 dark:bg-slate-700 relative">
+                                    <img src="https://images.unsplash.com/photo-1587620962725-abab7fe55159?w=500&q=80" alt="Coding" class="w-full h-full object-cover">
+                                    <span class="absolute top-2 left-2 px-2 py-1 bg-white/90 dark:bg-slate-800/90 rounded text-[10px] font-bold uppercase tracking-wider">Programming</span>
+                                </div>
+                                <div class="p-4">
+                                    <h4 class="font-bold mb-1 truncate text-slate-800 dark:text-slate-100">React JS For Beginners</h4>
+                                    <p class="text-xs text-slate-500 mb-4">Oleh Prof. Sarah J.</p>
+                                    <div class="space-y-2">
+                                        <div class="flex items-center justify-between text-xs mb-1">
+                                            <span>Progres</span>
+                                            <span class="font-bold text-primary-600">65%</span>
+                                        </div>
+                                        <div class="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                                            <div class="bg-primary-600 h-full w-[65%]"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Course Card 2 -->
+                            <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                                <div class="h-32 bg-slate-200 dark:bg-slate-700 relative">
+                                    <img src="https://images.unsplash.com/photo-1561070791-2526d30994b5?w=500&q=80" alt="Design" class="w-full h-full object-cover">
+                                    <span class="absolute top-2 left-2 px-2 py-1 bg-white/90 dark:bg-slate-800/90 rounded text-[10px] font-bold uppercase tracking-wider">Graphic Design</span>
+                                </div>
+                                <div class="p-4">
+                                    <h4 class="font-bold mb-1 truncate text-slate-800 dark:text-slate-100">Adobe Illustrator Master</h4>
+                                    <p class="text-xs text-slate-500 mb-4">Oleh Creative Studio</p>
+                                    <div class="space-y-2">
+                                        <div class="flex items-center justify-between text-xs mb-1">
+                                            <span>Progres</span>
+                                            <span class="font-bold text-primary-600">30%</span>
+                                        </div>
+                                        <div class="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                                            <div class="bg-primary-600 h-full w-[30%]"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Activities -->
+                    <div class="space-y-6">
+                        <h3 class="text-lg font-bold">Aktivitas Terkini</h3>
+                        <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-4 shadow-sm">
+                            <div class="flex items-start gap-3">
+                                <div class="p-2 bg-green-100 dark:bg-green-900/30 text-green-600 rounded-full shrink-0">
+                                    <i data-lucide="check" class="w-4 h-4"></i>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium">Selesai Kuis: React Hooks</p>
+                                    <p class="text-xs text-slate-500">2 jam yang lalu</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <div class="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-full shrink-0">
+                                    <i data-lucide="award" class="w-4 h-4"></i>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium">Mendapat Sertifikat Dasar CSS</p>
+                                    <p class="text-xs text-slate-500">Kemarin</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <div class="p-2 bg-orange-100 dark:bg-orange-900/30 text-orange-600 rounded-full shrink-0">
+                                    <i data-lucide="message-circle" class="w-4 h-4"></i>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium">Komentar baru di Forum UI/UX</p>
+                                    <p class="text-xs text-slate-500">2 hari yang lalu</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mini Calendar/Deadlines Placeholder -->
+                        <div class="bg-slate-800 p-6 rounded-2xl text-white">
+                            <h4 class="font-bold mb-4">Tenggat Waktu</h4>
+                            <div class="space-y-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 bg-slate-700 rounded-lg flex items-center justify-center font-bold">12</div>
+                                    <div>
+                                        <p class="text-xs font-semibold">Tugas Portofolio</p>
+                                        <p class="text-[10px] text-slate-400">Oktober 2023</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 bg-slate-700 rounded-lg flex items-center justify-center font-bold">15</div>
+                                    <div>
+                                        <p class="text-xs font-semibold">Ujian Akhir Backend</p>
+                                        <p class="text-[10px] text-slate-400">Oktober 2023</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Dark Mode Logic
+        function toggleTheme() {
+            const html = document.documentElement;
+            const sunIcon = document.getElementById('sun-icon');
+            const moonIcon = document.getElementById('moon-icon');
+            
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+                localStorage.setItem('theme', 'light');
+            } else {
+                html.classList.add('dark');
+                sunIcon.classList.remove('hidden');
+                moonIcon.classList.add('hidden');
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+
+        // Sidebar Logic
+        let sidebarCollapsed = false;
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const logoText = document.getElementById('logo-text');
+            const navTexts = document.querySelectorAll('.nav-text');
+            const collapseIcon = document.getElementById('collapse-icon');
+            
+            sidebarCollapsed = !sidebarCollapsed;
+            
+            if (sidebarCollapsed) {
+                sidebar.style.width = '72px';
+                logoText.classList.add('hidden');
+                navTexts.forEach(t => t.classList.add('hidden'));
+                collapseIcon.setAttribute('data-lucide', 'chevron-right');
+            } else {
+                sidebar.style.width = '256px';
+                logoText.classList.remove('hidden');
+                navTexts.forEach(t => t.classList.remove('hidden'));
+                collapseIcon.setAttribute('data-lucide', 'chevron-left');
+            }
+            lucide.createIcons();
+        }
+
+        // Mobile Sidebar Toggle
+        function toggleSidebarMobile() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('hidden');
+            // Logic to show/hide fixed overlay on mobile
+        }
+
+        // Load preferences
+        window.onload = () => {
+            if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+                document.getElementById('sun-icon').classList.remove('hidden');
+                document.getElementById('moon-icon').classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>

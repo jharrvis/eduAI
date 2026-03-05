@@ -1,183 +1,137 @@
-"use client";
+﻿"use client";
 
-import { useState, useRef, useEffect } from "react";
-import { useStore } from "@/store/useStore";
-import { motion } from "motion/react";
-import { Send, Bot, User, Loader2 } from "lucide-react";
-import { GoogleGenAI } from "@google/genai";
-import ReactMarkdown from "react-markdown";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { chatWithTutor, getClassChatMessages } from "@/app/actions/ai";
+import { getClasses } from "@/app/actions/classes";
+import { Bot, Loader2, Send, User } from "lucide-react";
 
-interface Message {
-  role: "user" | "model";
-  text: string;
-}
+type ClassItem = { id: string; name: string };
+type Message = { id: string; role: string; content: string; createdAt: Date };
 
-export default function StudentChat() {
-  const { currentUser, materials } = useStore();
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "model",
-      text: "Halo! Saya AI Tutor Anda. Ada yang bisa saya bantu terkait materi pelajaran hari ini?",
-    },
-  ]);
+export default function StudentChatPage() {
+  const [classes, setClasses] = useState<ClassItem[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const endRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const selectedClass = useMemo(
+    () => classes.find((item) => item.id === selectedClassId) || null,
+    [classes, selectedClassId],
+  );
+
+  const loadMessages = (classId: string) => {
+    startTransition(async () => {
+      try {
+        const rows = await getClassChatMessages(classId);
+        setMessages(rows as Message[]);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Gagal memuat chat.");
+      }
+    });
   };
 
   useEffect(() => {
-    scrollToBottom();
+    startTransition(async () => {
+      try {
+        const classRows = await getClasses();
+        const mapped = classRows.map((item) => ({ id: item.id, name: item.name }));
+        setClasses(mapped);
+
+        if (mapped[0]) {
+          setSelectedClassId(mapped[0].id);
+          loadMessages(mapped[0].id);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Gagal memuat kelas.");
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
-
-    const userMessage = input.trim();
-    setInput("");
-    setMessages((prev) => [...prev, { role: "user", text: userMessage }]);
-    setIsLoading(true);
-
-    try {
-      const ai = new GoogleGenAI({
-        apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY,
-      });
-
-      // Provide context from materials
-      const context = materials
-        .map((m) => `Judul: ${m.title}\nMateri: ${m.content}`)
-        .join("\n\n");
-
-      const historyText = messages
-        .map(
-          (m) => `${m.role === "user" ? "Mahasiswa" : "AI Tutor"}: ${m.text}`,
-        )
-        .join("\n\n");
-      const prompt = `Konteks Materi:\n${context}\n\nRiwayat Percakapan:\n${historyText}\n\nMahasiswa: ${userMessage}\n\nAI Tutor:`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-        config: {
-          systemInstruction: `Anda adalah AI Tutor yang ramah dan membantu untuk aplikasi EduAI. Anda membantu mahasiswa memahami materi pelajaran. Jawablah pertanyaan mahasiswa berdasarkan materi yang diberikan jika relevan. Jika tidak relevan, jawablah dengan pengetahuan umum yang edukatif. Gunakan bahasa Indonesia yang baik dan benar.`,
-        },
-      });
-
-      setMessages((prev) => [
-        ...prev,
-        { role: "model", text: response.text || "Maaf, saya tidak mengerti." },
-      ]);
-    } catch (error) {
-      console.error("Chat error:", error);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "model",
-          text: "Maaf, terjadi kesalahan saat memproses permintaan Anda.",
-        },
-      ]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (!currentUser) return null;
-
   return (
-    <div className="h-[calc(100vh-8rem)] flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-      <header className="p-6 border-b border-slate-200 bg-indigo-50 flex items-center gap-4">
-        <div className="w-12 h-12 bg-indigo-600 text-white rounded-full flex items-center justify-center">
-          <Bot className="w-6 h-6" />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold text-slate-900">AI Tutor</h1>
-          <p className="text-sm text-indigo-600 font-medium">
-            Online & Ready to help
-          </p>
-        </div>
-      </header>
-
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50">
-        {messages.map((msg, idx) => (
-          <motion.div
-            key={idx}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`flex items-start gap-4 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
-          >
-            <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                msg.role === "user"
-                  ? "bg-slate-900 text-white"
-                  : "bg-indigo-600 text-white"
-              }`}
+    <div className="grid h-[calc(100vh-8rem)] grid-cols-1 gap-4 lg:grid-cols-4">
+      <div className="app-card p-4 lg:col-span-1">
+        <h2 className="mb-3 text-sm font-semibold">Pilih Kelas</h2>
+        <div className="space-y-2">
+          {classes.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => {
+                setSelectedClassId(item.id);
+                loadMessages(item.id);
+              }}
+              className={`w-full rounded-xl px-3 py-2 text-left text-sm ${selectedClassId === item.id ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : "bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800"}`}
             >
-              {msg.role === "user" ? (
-                <User className="w-5 h-5" />
-              ) : (
-                <Bot className="w-5 h-5" />
-              )}
-            </div>
-            <div
-              className={`max-w-[80%] p-4 rounded-2xl ${
-                msg.role === "user"
-                  ? "bg-slate-900 text-white rounded-tr-none"
-                  : "bg-white border border-slate-200 text-slate-800 rounded-tl-none shadow-sm"
-              }`}
-            >
-              {msg.role === "user" ? (
-                <p className="whitespace-pre-wrap">{msg.text}</p>
-              ) : (
-                <div className="prose prose-sm max-w-none prose-slate">
-                  <ReactMarkdown>{msg.text}</ReactMarkdown>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        ))}
-        {isLoading && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex items-start gap-4"
-          >
-            <div className="w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center flex-shrink-0">
-              <Bot className="w-5 h-5" />
-            </div>
-            <div className="bg-white border border-slate-200 p-4 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-2">
-              <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
-              <span className="text-sm text-slate-500 font-medium">
-                AI is thinking...
-              </span>
-            </div>
-          </motion.div>
-        )}
-        <div ref={messagesEndRef} />
+              {item.name}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="p-4 border-t border-slate-200 bg-white">
-        <form onSubmit={handleSend} className="flex gap-3">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask your AI Tutor a question..."
-            className="flex-1 p-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-            disabled={isLoading}
-          />
-          <button
-            type="submit"
-            disabled={!input.trim() || isLoading}
-            className="px-6 py-4 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+      <div className="app-card flex min-h-0 flex-col p-0 lg:col-span-3">
+        <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-700">
+          <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">AI Tutor {selectedClass ? `• ${selectedClass.name}` : ""}</h1>
+        </div>
+
+        <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-5 dark:bg-slate-900/40">
+          {messages.map((msg) => {
+            const isUser = msg.role === "user";
+            return (
+              <div key={msg.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${isUser ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900" : "border border-slate-200 bg-white text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"}`}>
+                  <p className="mb-1 inline-flex items-center gap-2 text-xs opacity-70">{isUser ? <User className="h-3 w-3" /> : <Bot className="h-3 w-3" />}{isUser ? "Anda" : "AI Tutor"}</p>
+                  <p className="whitespace-pre-wrap">{msg.content}</p>
+                </div>
+              </div>
+            );
+          })}
+
+          {messages.length === 0 && (
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              {isPending ? <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Memuat chat...</span> : "Belum ada percakapan."}
+            </p>
+          )}
+
+          <div ref={endRef} />
+        </div>
+
+        <div className="border-t border-slate-200 p-4 dark:border-slate-700">
+          {error && <p className="mb-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!selectedClassId || !input.trim()) return;
+
+              const message = input;
+              setInput("");
+
+              startTransition(async () => {
+                try {
+                  await chatWithTutor(selectedClassId, message);
+                  await loadMessages(selectedClassId);
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : "Gagal mengirim pesan.");
+                }
+              });
+            }}
           >
-            <Send className="w-5 h-5" />
-            <span className="hidden sm:inline">Send</span>
-          </button>
-        </form>
+            <input className="app-input" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Tulis pertanyaan untuk AI Tutor" disabled={isPending || !selectedClassId} />
+            <button type="submit" className="app-btn-primary" disabled={isPending || !selectedClassId || !input.trim()}>
+              {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              Send
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );
 }
+

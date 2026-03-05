@@ -1,309 +1,194 @@
-"use client";
+﻿"use client";
 
-import { useState, useEffect } from "react";
-import { useStore, Material } from "@/store/useStore";
-import { motion } from "motion/react";
-import {
-  BookOpen,
-  CheckCircle,
-  HelpCircle,
-  ArrowLeft,
-  Send,
-} from "lucide-react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { getAssignmentsWithMySubmission, submitAssignment } from "@/app/actions/submissions";
+import { getMaterials } from "@/app/actions/materials";
+import FileUpload from "@/app/components/file-upload";
+import { BookOpen, CheckCircle, Loader2, Send } from "lucide-react";
 
-export default function StudentMaterials() {
-  const { currentUser, classes, materials, assignments, addAssignment } =
-    useStore();
-  const searchParams = useSearchParams();
-  const router = useRouter();
+type MaterialItem = {
+  id: string;
+  classId: string;
+  className: string;
+  title: string;
+  content: string | null;
+  fileUrl: string | null;
+  scheduledAt: Date;
+};
 
-  const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(
-    null,
-  );
-  const [quizAnswers, setQuizAnswers] = useState<Record<number, string>>({});
-  const [quizSubmitted, setQuizSubmitted] = useState(false);
-  const [quizScore, setQuizScore] = useState(0);
+type AssignmentItem = {
+  id: string;
+  materialId: string;
+  title: string;
+  instructions: string | null;
+  dueDate: Date;
+  mySubmission: { answerText: string | null } | null;
+};
 
-  const [assignmentText, setAssignmentText] = useState("");
+export default function StudentMaterialsPage() {
+  const [materials, setMaterials] = useState<MaterialItem[]>([]);
+  const [assignments, setAssignments] = useState<AssignmentItem[]>([]);
+  const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
+  const [answerText, setAnswerText] = useState("");
+  const [submissionFileUrl, setSubmissionFileUrl] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
-  const myClasses = currentUser
-    ? classes.filter((c) => c.students.includes(currentUser.id))
-    : [];
-  const myMaterials = materials.filter((m) =>
-    myClasses.some((c) => c.id === m.classId),
-  );
+  const loadData = useCallback(() => {
+    startTransition(async () => {
+      try {
+        const [materialRows, assignmentRows] = await Promise.all([
+          getMaterials(),
+          getAssignmentsWithMySubmission(),
+        ]);
+
+        setMaterials(materialRows as MaterialItem[]);
+        setAssignments(assignmentRows as AssignmentItem[]);
+
+        if (!selectedMaterialId && materialRows.length > 0) {
+          setSelectedMaterialId(materialRows[0].id);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Gagal memuat materi.");
+      }
+    });
+  }, [selectedMaterialId]);
 
   useEffect(() => {
-    const id = searchParams.get("id");
-    if (id) {
-      const mat = myMaterials.find((m) => m.id === id);
-      if (mat) setSelectedMaterial(mat);
-    }
-  }, [searchParams, myMaterials]);
+    loadData();
+  }, [loadData]);
 
-  if (!currentUser) return null;
+  const selectedMaterial = useMemo(
+    () => materials.find((m) => m.id === selectedMaterialId) || null,
+    [materials, selectedMaterialId],
+  );
 
-  const handleMaterialClick = (mat: Material) => {
-    setSelectedMaterial(mat);
-    setQuizAnswers({});
-    setQuizSubmitted(false);
-    setQuizScore(0);
-    setAssignmentText("");
-    router.push(`/student/materials?id=${mat.id}`);
-  };
+  const materialAssignments = useMemo(
+    () => assignments.filter((a) => a.materialId === selectedMaterialId),
+    [assignments, selectedMaterialId],
+  );
 
-  const handleBack = () => {
-    setSelectedMaterial(null);
-    router.push("/student/materials");
-  };
+  return (
+    <div className="space-y-6">
+      <header>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">My Materials</h1>
+        <p className="mt-2 text-slate-500 dark:text-slate-400">Materi tampil sesuai jadwal rilis dari dosen/admin.</p>
+      </header>
 
-  const submitQuiz = () => {
-    if (!selectedMaterial?.quiz) return;
-    let score = 0;
-    selectedMaterial.quiz.forEach((q, i) => {
-      if (quizAnswers[i] === q.answer) score++;
-    });
-    setQuizScore(score);
-    setQuizSubmitted(true);
-  };
+      {error && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">{error}</div>}
 
-  const submitAssignment = () => {
-    if (!selectedMaterial || !assignmentText.trim()) return;
-
-    addAssignment({
-      id: `a${Date.now()}`,
-      materialId: selectedMaterial.id,
-      studentId: currentUser.id,
-      submission: assignmentText,
-    });
-
-    alert("Assignment submitted successfully!");
-    setAssignmentText("");
-  };
-
-  if (selectedMaterial) {
-    const cls = classes.find((c) => c.id === selectedMaterial.classId);
-    const myAssignment = assignments.find(
-      (a) =>
-        a.materialId === selectedMaterial.id && a.studentId === currentUser.id,
-    );
-
-    return (
-      <motion.div
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
-        className="space-y-6"
-      >
-        <button
-          onClick={handleBack}
-          className="flex items-center gap-2 text-slate-500 hover:text-indigo-600 transition-colors font-medium"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Materials
-        </button>
-
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-          <div className="mb-6 pb-6 border-b border-slate-100">
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-              {selectedMaterial.title}
-            </h1>
-            <p className="text-indigo-600 font-medium mt-2">{cls?.name}</p>
-          </div>
-
-          <div className="prose prose-slate max-w-none mb-8">
-            <p className="whitespace-pre-wrap">{selectedMaterial.content}</p>
-          </div>
-
-          {selectedMaterial.summary && (
-            <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-100 mb-8">
-              <h3 className="text-emerald-800 font-bold mb-2 flex items-center gap-2">
-                <BookOpen className="w-5 h-5" />
-                AI Summary
-              </h3>
-              <p className="text-emerald-700 whitespace-pre-wrap text-sm leading-relaxed">
-                {selectedMaterial.summary}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="app-card p-4 lg:col-span-1">
+          <h2 className="mb-3 text-base font-semibold">Materials</h2>
+          <div className="space-y-2">
+            {materials.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  setSelectedMaterialId(item.id);
+                  setAnswerText("");
+                  setSubmissionFileUrl("");
+                }}
+                className={`w-full rounded-xl p-3 text-left transition ${selectedMaterialId === item.id ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : "bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800"}`}
+              >
+                <p className="font-medium">{item.title}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{item.className}</p>
+              </button>
+            ))}
+            {materials.length === 0 && (
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                {isPending ? <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Memuat...</span> : "Belum ada materi tersedia."}
               </p>
-            </div>
-          )}
-
-          {/* Quiz Section */}
-          {selectedMaterial.quiz && selectedMaterial.quiz.length > 0 && (
-            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 mb-8">
-              <h3 className="text-slate-900 font-bold text-xl mb-4 flex items-center gap-2">
-                <HelpCircle className="w-5 h-5 text-indigo-500" />
-                Knowledge Check Quiz
-              </h3>
-
-              <div className="space-y-6">
-                {selectedMaterial.quiz.map((q, i) => (
-                  <div
-                    key={i}
-                    className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm"
-                  >
-                    <p className="font-medium text-slate-900 mb-3">
-                      {i + 1}. {q.question}
-                    </p>
-                    <div className="space-y-2">
-                      {q.options.map((opt, j) => (
-                        <label
-                          key={j}
-                          className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                            quizAnswers[i] === opt
-                              ? "border-indigo-500 bg-indigo-50 text-indigo-900"
-                              : "border-slate-200 hover:bg-slate-50 text-slate-700"
-                          } ${quizSubmitted && opt === q.answer ? "border-emerald-500 bg-emerald-50 text-emerald-900" : ""}`}
-                        >
-                          <input
-                            type="radio"
-                            name={`quiz-${i}`}
-                            value={opt}
-                            disabled={quizSubmitted}
-                            checked={quizAnswers[i] === opt}
-                            onChange={() =>
-                              setQuizAnswers((prev) => ({ ...prev, [i]: opt }))
-                            }
-                            className="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500"
-                          />
-                          <span className="text-sm">{opt}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {!quizSubmitted ? (
-                <button
-                  onClick={submitQuiz}
-                  disabled={
-                    Object.keys(quizAnswers).length <
-                    selectedMaterial.quiz.length
-                  }
-                  className="mt-6 w-full py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Submit Quiz
-                </button>
-              ) : (
-                <div className="mt-6 p-4 bg-indigo-100 text-indigo-800 rounded-xl text-center font-bold text-lg">
-                  You scored {quizScore} out of {selectedMaterial.quiz.length}!
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Assignment Section */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200">
-            <h3 className="text-slate-900 font-bold text-xl mb-4 flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-emerald-500" />
-              Submit Assignment
-            </h3>
-
-            {myAssignment ? (
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <p className="text-sm font-medium text-emerald-600 mb-2 flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4" />
-                  Assignment Submitted
-                </p>
-                <p className="text-slate-700 text-sm whitespace-pre-wrap">
-                  {myAssignment.submission}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <textarea
-                  rows={4}
-                  value={assignmentText}
-                  onChange={(e) => setAssignmentText(e.target.value)}
-                  placeholder="Type your assignment submission here..."
-                  className="w-full p-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
-                />
-                <button
-                  onClick={submitAssignment}
-                  disabled={!assignmentText.trim()}
-                  className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ml-auto"
-                >
-                  <Send className="w-4 h-4" />
-                  Submit Work
-                </button>
-              </div>
             )}
           </div>
         </div>
-      </motion.div>
-    );
-  }
 
-  return (
-    <div className="space-y-8">
-      <header>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-          My Materials
-        </h1>
-        <p className="text-slate-500 mt-2">
-          Access your course content, quizzes, and assignments.
-        </p>
-      </header>
+        <div className="app-card p-6 lg:col-span-2">
+          {selectedMaterial ? (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{selectedMaterial.title}</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{selectedMaterial.className} • {new Date(selectedMaterial.scheduledAt).toLocaleString()}</p>
+              </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {myMaterials.map((material) => {
-          const cls = classes.find((c) => c.id === material.classId);
-          const hasAssignment = assignments.some(
-            (a) =>
-              a.materialId === material.id && a.studentId === currentUser.id,
-          );
+              <div className="rounded-xl bg-slate-50 p-4 dark:bg-slate-900">
+                <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-200">{selectedMaterial.content || "Materi tidak memiliki konten teks."}</p>
+                {selectedMaterial.fileUrl && <p className="mt-3 text-sm text-blue-600 dark:text-blue-400">Lampiran: {selectedMaterial.fileUrl}</p>}
+              </div>
 
-          return (
-            <motion.div
-              key={material.id}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              onClick={() => handleMaterialClick(material)}
-              className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer group"
-            >
-              <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                  <BookOpen className="w-6 h-6" />
-                </div>
-                {hasAssignment && (
-                  <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
-                    <CheckCircle className="w-3 h-3" />
-                    Done
-                  </span>
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Assignments</h3>
+                {materialAssignments.length > 0 ? (
+                  materialAssignments.map((assignment) => (
+                    <div key={assignment.id} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <p className="font-semibold text-slate-900 dark:text-slate-100">{assignment.title}</p>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">Due: {new Date(assignment.dueDate).toLocaleString()}</span>
+                      </div>
+                      {assignment.instructions && <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">{assignment.instructions}</p>}
+
+                      {assignment.mySubmission ? (
+                        <div className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
+                          <p className="mb-1 inline-flex items-center gap-2 font-medium"><CheckCircle className="h-4 w-4" />Sudah dikumpulkan</p>
+                          <p className="whitespace-pre-wrap">{assignment.mySubmission.answerText || "(Tanpa teks jawaban)"}</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <textarea
+                            rows={4}
+                            className="app-input"
+                            value={answerText}
+                            onChange={(e) => setAnswerText(e.target.value)}
+                            placeholder="Tulis jawaban assignment di sini"
+                          />
+                          <FileUpload
+                            label="Lampiran Tugas (Optional)"
+                            scope="submissions"
+                            value={submissionFileUrl}
+                            onChange={setSubmissionFileUrl}
+                            disabled={isPending}
+                          />
+                          <button
+                            type="button"
+                            className="app-btn-primary"
+                            disabled={isPending || !answerText.trim()}
+                            onClick={() => {
+                              startTransition(async () => {
+                                try {
+                                  await submitAssignment(assignment.id, {
+                                    answerText,
+                                    fileUrl: submissionFileUrl || undefined,
+                                  });
+                                  setAnswerText("");
+                                  setSubmissionFileUrl("");
+                                  await loadData();
+                                } catch (err) {
+                                  setError(err instanceof Error ? err.message : "Gagal submit assignment.");
+                                }
+                              });
+                            }}
+                          >
+                            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}Submit Assignment
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                    <BookOpen className="mx-auto mb-2 h-5 w-5" />
+                    Belum ada assignment untuk materi ini.
+                  </div>
                 )}
               </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-1 group-hover:text-indigo-600 transition-colors">
-                {material.title}
-              </h3>
-              <p className="text-sm text-slate-500 mb-4">{cls?.name}</p>
-
-              <div className="flex gap-2">
-                {material.summary && (
-                  <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded-md text-xs font-medium">
-                    Summary
-                  </span>
-                )}
-                {material.quiz && (
-                  <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded-md text-xs font-medium">
-                    Quiz
-                  </span>
-                )}
-              </div>
-            </motion.div>
-          );
-        })}
-        {myMaterials.length === 0 && (
-          <div className="col-span-full text-center py-12 bg-white rounded-2xl border border-slate-200 border-dashed">
-            <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <h3 className="text-lg font-medium text-slate-900">
-              No materials available
-            </h3>
-            <p className="text-slate-500 mt-1">
-              Your instructors haven&apos;t posted any materials yet.
-            </p>
-          </div>
-        )}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500 dark:text-slate-400">Pilih materi untuk melihat detail.</p>
+          )}
+        </div>
       </div>
     </div>
   );
 }
+

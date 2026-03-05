@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "EduAI - AI Powered LMS",
-  description: "Online learning platform with Admin and Student dashboards",
+  title: "EduFlow - AI Powered LMS",
+  description: "Platform pembelajaran online untuk admin dan student",
 };
 
 export default function RootLayout({
@@ -15,9 +15,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="id" className={inter.variable}>
       <body
-        className="font-sans bg-slate-50 text-slate-900 antialiased"
+        className="font-sans text-slate-900 antialiased transition-colors duration-200 dark:text-slate-100"
         suppressHydrationWarning
       >
         {children}

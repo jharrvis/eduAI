@@ -1,95 +1,88 @@
-"use client";
+﻿"use client";
 
-import { useStore } from "@/store/useStore";
-import { motion } from "motion/react";
-import { CheckCircle, BookOpen } from "lucide-react";
-import Link from "next/link";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { getAssignmentsWithMySubmission } from "@/app/actions/submissions";
+import { CheckCircle, Loader2 } from "lucide-react";
 
-export default function StudentAssignments() {
-  const { currentUser, assignments, materials, classes } = useStore();
+type AssignmentRow = {
+  id: string;
+  title: string;
+  className: string;
+  materialTitle: string;
+  dueDate: Date;
+  mySubmission: {
+    answerText: string | null;
+    aiFeedback: string | null;
+    aiScore: number | null;
+    finalGrade: number | null;
+    status: string;
+  } | null;
+};
 
-  if (!currentUser) return null;
+export default function StudentAssignmentsPage() {
+  const [rows, setRows] = useState<AssignmentRow[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
-  const myAssignments = assignments.filter(
-    (a) => a.studentId === currentUser.id,
-  );
+  useEffect(() => {
+    startTransition(async () => {
+      try {
+        const assignments = await getAssignmentsWithMySubmission();
+        setRows(assignments as AssignmentRow[]);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Gagal memuat assignment.");
+      }
+    });
+  }, []);
+
+  const submitted = useMemo(() => rows.filter((item) => item.mySubmission), [rows]);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <header>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-          My Assignments
-        </h1>
-        <p className="text-slate-500 mt-2">
-          View your submitted assignments and grades.
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">My Assignments</h1>
+        <p className="mt-2 text-slate-500 dark:text-slate-400">Riwayat assignment dan hasil penilaian Anda.</p>
       </header>
 
-      <div className="grid grid-cols-1 gap-6">
-        {myAssignments.map((assignment) => {
-          const material = materials.find(
-            (m) => m.id === assignment.materialId,
-          );
-          const cls = classes.find((c) => c.id === material?.classId);
+      {error && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">{error}</div>}
 
-          return (
-            <motion.div
-              key={assignment.id}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"
-            >
-              <div className="flex justify-between items-start mb-4">
+      <div className="app-card p-6">
+        <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">Submitted: <span className="font-semibold">{submitted.length}</span> / {rows.length}</p>
+
+        <div className="space-y-3">
+          {rows.map((item) => (
+            <div key={item.id} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h3 className="text-xl font-bold text-slate-900">
-                    {material?.title || "Unknown Material"}
-                  </h3>
-                  <p className="text-sm text-indigo-600 font-medium mt-1">
-                    {cls?.name}
-                  </p>
+                  <h3 className="font-semibold text-slate-900 dark:text-slate-100">{item.title}</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{item.className} • {item.materialTitle}</p>
                 </div>
-                <div className="flex flex-col items-end gap-2">
-                  <span className="flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">
-                    <CheckCircle className="w-4 h-4" />
-                    Submitted
-                  </span>
-                  {assignment.grade !== undefined && (
-                    <span className="text-sm font-bold text-slate-900 bg-slate-100 px-3 py-1 rounded-full">
-                      Grade: {assignment.grade}/100
-                    </span>
-                  )}
-                </div>
+                <span className="text-xs text-slate-500 dark:text-slate-400">Due: {new Date(item.dueDate).toLocaleString()}</span>
               </div>
 
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mt-4">
-                <p className="text-sm font-medium text-slate-700 mb-2">
-                  Your Submission:
-                </p>
-                <p className="text-slate-600 whitespace-pre-wrap text-sm">
-                  {assignment.submission}
-                </p>
-              </div>
-            </motion.div>
-          );
-        })}
-        {myAssignments.length === 0 && (
-          <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 border-dashed">
-            <CheckCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <h3 className="text-lg font-medium text-slate-900">
-              No assignments submitted
-            </h3>
-            <p className="text-slate-500 mt-1">
-              Go to your materials to complete assignments.
-            </p>
-            <Link
-              href="/student/materials"
-              className="inline-block mt-4 text-indigo-600 font-medium hover:text-indigo-700"
-            >
-              View Materials &rarr;
-            </Link>
-          </div>
-        )}
+              {item.mySubmission ? (
+                <div className="space-y-2 rounded-lg bg-emerald-50 p-3 text-sm dark:bg-emerald-900/20">
+                  <p className="inline-flex items-center gap-2 font-medium text-emerald-700 dark:text-emerald-300"><CheckCircle className="h-4 w-4" />Status: {item.mySubmission.status}</p>
+                  {item.mySubmission.finalGrade !== null && <p>Final Grade: <span className="font-semibold">{item.mySubmission.finalGrade}</span></p>}
+                  {item.mySubmission.aiScore !== null && <p>AI Score: <span className="font-semibold">{item.mySubmission.aiScore}</span></p>}
+                  {item.mySubmission.aiFeedback && <p className="whitespace-pre-wrap">Feedback: {item.mySubmission.aiFeedback}</p>}
+                </div>
+              ) : (
+                <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                  Belum dikumpulkan. Silakan buka menu My Materials untuk submit.
+                </div>
+              )}
+            </div>
+          ))}
+
+          {rows.length === 0 && (
+            <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-500 dark:border-slate-700 dark:text-slate-400">
+              {isPending ? <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Memuat assignment...</span> : "Belum ada assignment."}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
+

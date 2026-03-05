@@ -1,135 +1,125 @@
-"use client";
+﻿"use client";
 
-import { useStore } from "@/store/useStore";
-import { motion } from "motion/react";
-import { BookOpen, Users, Calendar, CheckCircle } from "lucide-react";
+import { useEffect, useState, useTransition } from "react";
+import { getAssignments } from "@/app/actions/assignments";
+import { getClassesWithMembers } from "@/app/actions/classes";
+import { getMaterials } from "@/app/actions/materials";
+import { getStudents } from "@/app/actions/users";
+import { BookOpen, Calendar, CheckCircle, Loader2, Users } from "lucide-react";
 
 export default function AdminDashboard() {
-  const { classes, materials, users, assignments } = useStore();
-  const students = users.filter((u) => u.role === "student");
+  const [stats, setStats] = useState({
+    classes: 0,
+    materials: 0,
+    students: 0,
+    assignments: 0,
+  });
+  const [recentClasses, setRecentClasses] = useState<Array<{ id: string; name: string; academicYear: string; students: number }>>([]);
+  const [recentMaterials, setRecentMaterials] = useState<Array<{ id: string; title: string; className: string }>>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
-  const stats = [
-    {
-      name: "Total Classes",
-      value: classes.length,
-      icon: Calendar,
-      color: "bg-blue-500",
-    },
-    {
-      name: "Total Materials",
-      value: materials.length,
-      icon: BookOpen,
-      color: "bg-indigo-500",
-    },
-    {
-      name: "Total Students",
-      value: students.length,
-      icon: Users,
-      color: "bg-emerald-500",
-    },
-    {
-      name: "Assignments Submitted",
-      value: assignments.length,
-      icon: CheckCircle,
-      color: "bg-amber-500",
-    },
-  ];
+  useEffect(() => {
+    startTransition(async () => {
+      try {
+        const [classes, materials, students, assignments] = await Promise.all([
+          getClassesWithMembers(),
+          getMaterials(),
+          getStudents(),
+          getAssignments(),
+        ]);
+
+        setStats({
+          classes: classes.length,
+          materials: materials.length,
+          students: students.length,
+          assignments: assignments.length,
+        });
+
+        setRecentClasses(
+          classes.slice(0, 5).map((item) => ({
+            id: item.id,
+            name: item.name,
+            academicYear: item.academicYear,
+            students: item.students.length,
+          })),
+        );
+
+        setRecentMaterials(
+          materials.slice(0, 5).map((item) => ({
+            id: item.id,
+            title: item.title,
+            className: item.className,
+          })),
+        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Gagal memuat dashboard.");
+      }
+    });
+  }, []);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <header>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-          Dashboard Overview
-        </h1>
-        <p className="text-slate-500 mt-2">
-          Welcome back! Here&apos;s what&apos;s happening today.
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Dashboard Overview</h1>
+        <p className="mt-2 text-slate-500 dark:text-slate-400">Ringkasan statistik LMS terbaru.</p>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => (
-          <motion.div
-            key={stat.name}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4"
-          >
-            <div className={`p-4 rounded-xl ${stat.color} text-white`}>
-              <stat.icon className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-slate-500">{stat.name}</p>
-              <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
-            </div>
-          </motion.div>
-        ))}
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">
+          {error}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="app-card flex items-center gap-4 p-5">
+          <div className="rounded-xl bg-blue-100 p-3 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"><Calendar className="h-5 w-5" /></div>
+          <div><p className="text-sm text-slate-500 dark:text-slate-400">Total Classes</p><p className="text-2xl font-bold">{stats.classes}</p></div>
+        </div>
+        <div className="app-card flex items-center gap-4 p-5">
+          <div className="rounded-xl bg-indigo-100 p-3 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"><BookOpen className="h-5 w-5" /></div>
+          <div><p className="text-sm text-slate-500 dark:text-slate-400">Total Materials</p><p className="text-2xl font-bold">{stats.materials}</p></div>
+        </div>
+        <div className="app-card flex items-center gap-4 p-5">
+          <div className="rounded-xl bg-emerald-100 p-3 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"><Users className="h-5 w-5" /></div>
+          <div><p className="text-sm text-slate-500 dark:text-slate-400">Total Students</p><p className="text-2xl font-bold">{stats.students}</p></div>
+        </div>
+        <div className="app-card flex items-center gap-4 p-5">
+          <div className="rounded-xl bg-amber-100 p-3 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"><CheckCircle className="h-5 w-5" /></div>
+          <div><p className="text-sm text-slate-500 dark:text-slate-400">Assignments</p><p className="text-2xl font-bold">{stats.assignments}</p></div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Recent Classes */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">
-            Recent Classes
-          </h2>
-          <div className="space-y-4">
-            {classes.slice(0, 5).map((cls) => (
-              <div
-                key={cls.id}
-                className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-100"
-              >
-                <div>
-                  <h3 className="font-medium text-slate-900">{cls.name}</h3>
-                  <p className="text-sm text-slate-500">{cls.schedule}</p>
-                </div>
-                <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
-                  {cls.students.length} Students
-                </span>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="app-card p-6">
+          <h2 className="mb-4 text-lg font-semibold">Recent Classes</h2>
+          <div className="space-y-3">
+            {recentClasses.map((item) => (
+              <div key={item.id} className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900">
+                <p className="font-medium">{item.name}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{item.academicYear} • {item.students} students</p>
               </div>
             ))}
-            {classes.length === 0 && (
-              <p className="text-slate-500 text-center py-4">No classes yet.</p>
+            {recentClasses.length === 0 && (
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                {isPending ? <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Memuat...</span> : "Belum ada kelas."}
+              </p>
             )}
           </div>
         </div>
 
-        {/* Recent Materials */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">
-            Recent Materials
-          </h2>
-          <div className="space-y-4">
-            {materials.slice(0, 5).map((mat) => {
-              const cls = classes.find((c) => c.id === mat.classId);
-              return (
-                <div
-                  key={mat.id}
-                  className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-100"
-                >
-                  <div>
-                    <h3 className="font-medium text-slate-900">{mat.title}</h3>
-                    <p className="text-sm text-slate-500">
-                      {cls?.name || "Unknown Class"}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    {mat.summary && (
-                      <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-md text-xs font-medium">
-                        Summary
-                      </span>
-                    )}
-                    {mat.quiz && (
-                      <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-md text-xs font-medium">
-                        Quiz
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-            {materials.length === 0 && (
-              <p className="text-slate-500 text-center py-4">
-                No materials yet.
+        <div className="app-card p-6">
+          <h2 className="mb-4 text-lg font-semibold">Recent Materials</h2>
+          <div className="space-y-3">
+            {recentMaterials.map((item) => (
+              <div key={item.id} className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900">
+                <p className="font-medium">{item.title}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{item.className}</p>
+              </div>
+            ))}
+            {recentMaterials.length === 0 && (
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                {isPending ? <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Memuat...</span> : "Belum ada materi."}
               </p>
             )}
           </div>
@@ -138,3 +128,4 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
