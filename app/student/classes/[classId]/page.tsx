@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
-import { getAssignmentsWithMySubmission } from "@/app/actions/submissions";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { getAssignmentsWithMySubmission, submitAssignment } from "@/app/actions/submissions";
 import { getStudentClassById } from "@/app/actions/classes";
 import { getMeetings } from "@/app/actions/class-meetings";
 import { getMaterials } from "@/app/actions/materials";
-import { useParams } from "next/navigation";
+import FileUpload from "@/app/components/file-upload";
 import { Lock, Unlock } from "lucide-react";
+import { useParams } from "next/navigation";
 
 type Meeting = {
   id: string;
@@ -29,7 +30,13 @@ type Assignment = {
   meetingId: string | null;
   title: string;
   dueDate: Date;
-  mySubmission: { answerText: string | null } | null;
+  mySubmission: {
+    answerText: string | null;
+    aiFeedback: string | null;
+    aiScore: number | null;
+    finalGrade: number | null;
+    status: string;
+  } | null;
 };
 
 export default function StudentClassDetailPage() {
@@ -39,10 +46,12 @@ export default function StudentClassDetailPage() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [answerMap, setAnswerMap] = useState<Record<string, string>>({});
+  const [fileMap, setFileMap] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  useEffect(() => {
+  const loadData = useCallback(() => {
     startTransition(async () => {
       try {
         const classData = await getStudentClassById(classId);
@@ -61,6 +70,10 @@ export default function StudentClassDetailPage() {
       }
     });
   }, [classId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const now = new Date();
 
@@ -136,12 +149,7 @@ export default function StudentClassDetailPage() {
                           <p className="font-medium">{m.title}</p>
                           {m.content && <p className="mt-1 whitespace-pre-wrap text-slate-600 dark:text-slate-300">{m.content}</p>}
                           {m.fileUrl && (
-                            <a
-                              href={m.fileUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="mt-1 inline-block text-blue-600 underline dark:text-blue-400"
-                            >
+                            <a href={m.fileUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-blue-600 underline dark:text-blue-400">
                               Buka Lampiran
                             </a>
                           )}
@@ -153,13 +161,72 @@ export default function StudentClassDetailPage() {
                   <div>
                     <h3 className="mb-2 font-semibold">Tugas</h3>
                     <div className="space-y-2">
-                      {meetingAssignments.map((a) => (
-                        <div key={a.id} className="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700">
-                          <p className="font-medium">{a.title}</p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">Tenggat: {new Date(a.dueDate).toLocaleString()}</p>
-                          <p className="mt-1 text-xs">{a.mySubmission ? "Sudah dikumpulkan" : "Belum dikumpulkan"}</p>
-                        </div>
-                      ))}
+                      {meetingAssignments.map((a) => {
+                        const isRevision = a.mySubmission?.status === "REVISION";
+                        const canSubmit = !a.mySubmission || isRevision;
+                        const answerValue = answerMap[a.id] ?? a.mySubmission?.answerText ?? "";
+                        const isLate = new Date(a.dueDate) < new Date() && !a.mySubmission;
+
+                        return (
+                          <div key={a.id} className="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700">
+                            <p className="font-medium">{a.title}</p>
+                            <div className="mt-1 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                              <span>Tenggat: {new Date(a.dueDate).toLocaleString()}</span>
+                              {isLate && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-600">Terlambat</span>}
+                            </div>
+
+                            {canSubmit ? (
+                              <div className="mt-2 space-y-2">
+                                {isRevision && (
+                                  <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+                                    Perlu revisi. Silakan kirim ulang.
+                                  </p>
+                                )}
+                                <textarea
+                                  rows={3}
+                                  className="app-input"
+                                  value={answerValue}
+                                  onChange={(e) => setAnswerMap((prev) => ({ ...prev, [a.id]: e.target.value }))}
+                                  placeholder="Jawaban Anda"
+                                />
+                                <FileUpload
+                                  label="Lampiran (Opsional)"
+                                  scope="submissions"
+                                  value={fileMap[a.id] || ""}
+                                  onChange={(fileUrl) => setFileMap((prev) => ({ ...prev, [a.id]: fileUrl }))}
+                                  disabled={isPending}
+                                />
+                                <button
+                                  type="button"
+                                  className="app-btn-primary"
+                                  disabled={isPending || !answerValue.trim()}
+                                  onClick={() => {
+                                    startTransition(async () => {
+                                      try {
+                                        await submitAssignment(a.id, {
+                                          answerText: answerValue,
+                                          fileUrl: fileMap[a.id] || undefined,
+                                        });
+                                        await loadData();
+                                      } catch (err) {
+                                        setError(err instanceof Error ? err.message : "Gagal mengumpulkan tugas.");
+                                      }
+                                    });
+                                  }}
+                                >
+                                  {isRevision ? "Kirim Revisi" : "Kumpulkan"}
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="mt-2 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
+                                <p>Status: {a.mySubmission?.status}</p>
+                                {a.mySubmission?.finalGrade !== null && <p>Nilai Akhir: <span className="font-semibold">{a.mySubmission.finalGrade}</span></p>}
+                                {a.mySubmission?.aiFeedback && <p className="whitespace-pre-wrap">Umpan Balik: {a.mySubmission.aiFeedback}</p>}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                       {meetingAssignments.length === 0 && <p className="text-sm text-slate-500 dark:text-slate-400">Belum ada tugas.</p>}
                     </div>
                   </div>

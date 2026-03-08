@@ -1,11 +1,11 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { getClasses } from "@/app/actions/classes";
 import { getMeetings } from "@/app/actions/class-meetings";
 import { createMaterial, deleteMaterial, getMaterials, updateMaterial } from "@/app/actions/materials";
 import FileUpload from "@/app/components/file-upload";
-import { Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Copy, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 
 type ClassItem = { id: string; name: string };
 type MaterialItem = {
@@ -20,7 +20,7 @@ type MaterialItem = {
   fileUrl: string | null;
   scheduledAt: Date;
 };
-type MeetingItem = { id: string; title: string; meetingNumber: number };
+type MeetingItem = { id: string; classId: string; title: string; meetingNumber: number; scheduledDate: Date };
 
 type MaterialForm = {
   classId: string;
@@ -44,6 +44,8 @@ export default function TeacherMaterialsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
+  const [copySource, setCopySource] = useState<MaterialItem | null>(null);
+  const [copyClassIds, setCopyClassIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [form, setForm] = useState<MaterialForm>({
@@ -55,25 +57,44 @@ export default function TeacherMaterialsPage() {
     scheduledAt: "",
   });
 
-  const loadData = () => {
+  const groupedMaterials = useMemo(() => {
+    const map = new Map<string, MaterialItem[]>();
+    rows.forEach((item) => {
+      if (!map.has(item.className)) map.set(item.className, []);
+      map.get(item.className)?.push(item);
+    });
+    return map;
+  }, [rows]);
+
+  const loadMeetings = (classId: string) => {
+    startTransition(async () => {
+      const meetingRows = await getMeetings(classId);
+      setMeetings((meetingRows as MeetingItem[]).map((m) => ({
+        id: m.id,
+        classId: m.classId,
+        title: m.title,
+        meetingNumber: m.meetingNumber,
+        scheduledDate: new Date(m.scheduledDate),
+      })));
+    });
+  };
+
+  const loadData = useCallback(() => {
     startTransition(async () => {
       try {
         const [classRows, materialRows] = await Promise.all([getClasses(), getMaterials()]);
         setClasses(classRows.map((item) => ({ id: item.id, name: item.name })));
         setRows(materialRows as MaterialItem[]);
-        if (classRows[0]) {
-          const meetingRows = await getMeetings(classRows[0].id);
-          setMeetings((meetingRows as MeetingItem[]).map((m) => ({ id: m.id, title: m.title, meetingNumber: m.meetingNumber })));
-        }
+        if (classRows[0]) loadMeetings(classRows[0].id);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Gagal memuat materi.");
       }
     });
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const openCreate = () => {
     setEditingId(null);
@@ -81,12 +102,7 @@ export default function TeacherMaterialsPage() {
     const firstClassId = classes[0]?.id || "";
     setSelectedClassIds(firstClassId ? [firstClassId] : []);
     setForm({ classId: firstClassId, meetingId: "", title: "", content: "", fileUrl: "", scheduledAt: "" });
-    if (firstClassId) {
-      startTransition(async () => {
-        const meetingRows = await getMeetings(firstClassId);
-        setMeetings((meetingRows as MeetingItem[]).map((m) => ({ id: m.id, title: m.title, meetingNumber: m.meetingNumber })));
-      });
-    }
+    if (firstClassId) loadMeetings(firstClassId);
     setIsModalOpen(true);
   };
 
@@ -102,23 +118,14 @@ export default function TeacherMaterialsPage() {
       fileUrl: item.fileUrl || "",
       scheduledAt: toLocalInputValue(item.scheduledAt),
     });
-    startTransition(async () => {
-      const meetingRows = await getMeetings(item.classId);
-      setMeetings(
-        (meetingRows as MeetingItem[]).map((m) => ({
-          id: m.id,
-          title: m.title,
-          meetingNumber: m.meetingNumber,
-        })),
-      );
-    });
+    loadMeetings(item.classId);
     setIsModalOpen(true);
   };
 
   const saveMaterial = (e: React.FormEvent) => {
     e.preventDefault();
     const targetClassIds = editingId ? [form.classId] : selectedClassIds;
-    if (targetClassIds.length === 0 || !form.title.trim() || !form.scheduledAt) {
+    if (targetClassIds.length === 0 || !form.title.trim() || (!form.scheduledAt && !form.meetingId)) {
       setError("Kelas, judul, dan jadwal wajib diisi.");
       return;
     }
@@ -127,11 +134,12 @@ export default function TeacherMaterialsPage() {
       try {
         if (editingId) {
           await updateMaterial(editingId, {
+            classId: form.classId,
             meetingId: form.meetingId || null,
             title: form.title,
             content: form.content,
             fileUrl: form.fileUrl,
-            scheduledAt: form.scheduledAt,
+            scheduledAt: form.scheduledAt || undefined,
           });
         } else {
           await createMaterial({
@@ -141,7 +149,7 @@ export default function TeacherMaterialsPage() {
             title: form.title,
             content: form.content,
             fileUrl: form.fileUrl,
-            scheduledAt: form.scheduledAt,
+            scheduledAt: form.scheduledAt || new Date().toISOString(),
           });
         }
 
@@ -168,31 +176,54 @@ export default function TeacherMaterialsPage() {
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">{error}</div>}
 
-      <div className="space-y-3">
-        {rows.map((item) => (
-          <div key={item.id} className="app-card p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="font-semibold text-slate-900 dark:text-slate-100">{item.title}</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400">{item.className} • {new Date(item.scheduledAt).toLocaleString()} {item.meetingNumber ? `• P${item.meetingNumber}` : ""}</p>
-                {item.fileUrl && <p className="mt-1 text-sm text-blue-600 dark:text-blue-400">Lampiran: {item.fileUrl}</p>}
-              </div>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => openEdit(item)} className="rounded-lg p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"><Pencil className="h-4 w-4" /></button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!window.confirm(`Hapus materi '${item.title}'?`)) return;
-                    startTransition(async () => {
-                      await deleteMaterial(item.id);
-                      await loadData();
-                    });
-                  }}
-                  className="rounded-lg p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
+      <div className="space-y-4">
+        {Array.from(groupedMaterials.entries()).map(([className, materials]) => (
+          <div key={className} className="app-card p-5">
+            <h2 className="mb-3 text-lg font-semibold text-slate-900 dark:text-slate-100">{className}</h2>
+            <div className="space-y-3">
+              {materials.map((item) => (
+                <div key={item.id} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold text-slate-900 dark:text-slate-100">{item.title}</h3>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">{new Date(item.scheduledAt).toLocaleString()} {item.meetingNumber ? `• P${item.meetingNumber}` : ""}</p>
+                      {item.content && <p className="mt-1 line-clamp-2 text-sm text-slate-600 dark:text-slate-300">{item.content}</p>}
+                      {item.fileUrl && (
+                        <a href={item.fileUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-sm text-blue-600 underline dark:text-blue-400">
+                          Buka Lampiran
+                        </a>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => openEdit(item)} className="rounded-lg p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"><Pencil className="h-4 w-4" /></button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const targets = classes.filter((c) => c.id !== item.classId).map((c) => c.id);
+                          setCopySource(item);
+                          setCopyClassIds(targets);
+                        }}
+                        className="rounded-lg p-2 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!window.confirm(`Hapus materi '${item.title}'?`)) return;
+                          startTransition(async () => {
+                            await deleteMaterial(item.id);
+                            await loadData();
+                          });
+                        }}
+                        className="rounded-lg p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         ))}
@@ -223,10 +254,7 @@ export default function TeacherMaterialsPage() {
                       const nextClassId = e.target.value;
                       setForm((prev) => ({ ...prev, classId: nextClassId, meetingId: "" }));
                       setSelectedClassIds([nextClassId]);
-                      startTransition(async () => {
-                        const meetingRows = await getMeetings(nextClassId);
-                        setMeetings((meetingRows as MeetingItem[]).map((m) => ({ id: m.id, title: m.title, meetingNumber: m.meetingNumber })));
-                      });
+                      loadMeetings(nextClassId);
                     }}
                     required
                   >
@@ -250,10 +278,7 @@ export default function TeacherMaterialsPage() {
                               if (next.length === 1) {
                                 const classId = next[0];
                                 setForm((prev) => ({ ...prev, classId, meetingId: "" }));
-                                startTransition(async () => {
-                                  const meetingRows = await getMeetings(classId);
-                                  setMeetings((meetingRows as MeetingItem[]).map((m) => ({ id: m.id, title: m.title, meetingNumber: m.meetingNumber })));
-                                });
+                                loadMeetings(classId);
                               } else {
                                 setForm((prev) => ({ ...prev, classId: next[0] || "", meetingId: "" }));
                                 setMeetings([]);
@@ -273,15 +298,21 @@ export default function TeacherMaterialsPage() {
                   className="app-input"
                   value={form.meetingId}
                   disabled={!editingId && selectedClassIds.length !== 1}
-                  onChange={(e) => setForm((prev) => ({ ...prev, meetingId: e.target.value }))}
+                  onChange={(e) => {
+                    const meetingId = e.target.value;
+                    const meeting = meetings.find((m) => m.id === meetingId);
+                    setForm((prev) => ({
+                      ...prev,
+                      meetingId,
+                      scheduledAt: meeting ? toLocalInputValue(new Date(meeting.scheduledDate)) : prev.scheduledAt,
+                    }));
+                  }}
                 >
                   <option value="">Tanpa pertemuan</option>
                   {meetings.map((item) => (<option key={item.id} value={item.id}>P{item.meetingNumber} - {item.title}</option>))}
                 </select>
                 {!editingId && selectedClassIds.length !== 1 && (
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Pilihan pertemuan aktif jika kelas yang dipilih tepat satu.
-                  </p>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Pertemuan aktif jika kelas yang dipilih tepat satu.</p>
                 )}
               </div>
               <div>
@@ -301,7 +332,15 @@ export default function TeacherMaterialsPage() {
               />
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Jadwal Tayang</label>
-                <input type="datetime-local" className="app-input" value={form.scheduledAt} onChange={(e) => setForm((prev) => ({ ...prev, scheduledAt: e.target.value }))} required />
+                <input
+                  type="datetime-local"
+                  className="app-input"
+                  value={form.scheduledAt}
+                  onChange={(e) => setForm((prev) => ({ ...prev, scheduledAt: e.target.value }))}
+                  disabled={Boolean(form.meetingId)}
+                  required={!form.meetingId}
+                />
+                {form.meetingId && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Jadwal otomatis mengikuti jadwal pertemuan.</p>}
               </div>
 
               <div className="flex justify-end gap-2">
@@ -309,6 +348,63 @@ export default function TeacherMaterialsPage() {
                 <button type="submit" className="app-btn-primary" disabled={isPending}>{isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{editingId ? "Perbarui" : "Simpan"}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {copySource && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="app-card w-full max-w-xl p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Salin ke Kelas Lain</h2>
+              <button type="button" onClick={() => setCopySource(null)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="max-h-52 space-y-2 overflow-y-auto rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+              {classes.filter((c) => c.id !== copySource.classId).map((item) => (
+                <label key={item.id} className="flex cursor-pointer items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={copyClassIds.includes(item.id)}
+                    onChange={(e) => {
+                      const next = e.target.checked
+                        ? [...copyClassIds, item.id]
+                        : copyClassIds.filter((id) => id !== item.id);
+                      setCopyClassIds(next);
+                    }}
+                  />
+                  <span>{item.name}</span>
+                </label>
+              ))}
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" className="app-btn-ghost" onClick={() => setCopySource(null)}>Batal</button>
+              <button
+                type="button"
+                className="app-btn-primary"
+                disabled={isPending || copyClassIds.length === 0}
+                onClick={() => {
+                  startTransition(async () => {
+                    try {
+                      await createMaterial({
+                        classId: copyClassIds[0],
+                        classIds: copyClassIds,
+                        title: copySource.title,
+                        content: copySource.content || undefined,
+                        fileUrl: copySource.fileUrl || undefined,
+                        scheduledAt: new Date(copySource.scheduledAt).toISOString(),
+                      });
+                      setCopySource(null);
+                      await loadData();
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : "Gagal menyalin materi.");
+                    }
+                  });
+                }}
+              >
+                {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Salin Materi
+              </button>
+            </div>
           </div>
         </div>
       )}

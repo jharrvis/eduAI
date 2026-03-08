@@ -239,6 +239,7 @@ MAHASISWA
 | `app/student/materials/page.tsx` | Fix filter assignment (fallback ke meetingId), fix re-submit | 🔴 |
 | `app/student/assignments/page.tsx` | Tambah form submit, fix type `mySubmission.status` | 🔴 |
 | `app/teacher/assignments/page.tsx` | Fix materialId optional saat meetingId ada | 🔴 |
+| `app/teacher/materials/page.tsx` | Fix scheduledAt auto-fill, fileUrl link, copy button, grouping | 🔴 |
 | `app/admin/layout.tsx` | Tambah nav items Jurusan & Ruangan | 🟡 |
 | `app/student/materials/page.tsx` | Fix fileUrl jadi `<a>` link | 🟡 |
 | `app/teacher/assignments/page.tsx` | Fix fileUrl jadi `<a>` link, tambah success notification | 🟡 |
@@ -253,3 +254,127 @@ MAHASISWA
 4. **Student (after meeting date)**: Meeting terbuka → lihat materi (unduh file) → submit tugas → lihat status PENDING
 5. **Teacher grading**: Assignments page → pilih tugas → lihat submission → isi nilai → simpan → cek status GRADED
 6. **Student revision**: Assignments page → lihat status REVISION → isi ulang jawaban → submit → status kembali PENDING
+
+---
+
+## Audit: Teacher Materials — Multi-Class & UX Issues
+
+### Analisis Current State
+
+**Yang sudah benar ✅**
+- `createMaterial()` di `app/actions/materials.ts` menerima `classIds[]` → insert N baris untuk N kelas
+- Teacher hanya bisa akses kelas yang dia ampu (validasi loop enrollment per classId)
+- CRUD lengkap: create, edit, delete dengan `FileUpload` component
+- Multi-class checkbox UI sudah ada di form create
+
+### Bug & Issues
+
+---
+
+#### 11. scheduledAt masih required saat meeting dipilih
+**File:** `app/teacher/materials/page.tsx`
+
+**Root cause:**
+1. `MeetingItem` type hanya punya `{ id, title, meetingNumber }` — tidak ada `scheduledDate`
+2. Saat teacher pilih meeting, field `scheduledAt` di form tidak auto-fill
+3. UI validation `!form.scheduledAt` masih memblokir submit meskipun meetingId dipilih
+4. Backend sudah benar: jika `meetingId` ada, `scheduledAt` di-override dari `meeting.scheduledDate`
+
+**Solusi:**
+1. Tambah `scheduledDate: Date` ke `MeetingItem` type dan fetch saat load meetings
+2. Saat teacher pilih meeting → auto-fill `form.scheduledAt` dari `meeting.scheduledDate`
+3. Disable input `scheduledAt` jika `form.meetingId` ada (tampilkan info: "Jadwal otomatis dari pertemuan")
+4. Ubah validasi: `!form.scheduledAt && !form.meetingId` → error
+
+```tsx
+// Auto-fill scheduledAt saat meeting dipilih
+onChange={(e) => {
+  const meetingId = e.target.value;
+  const meeting = meetings.find((m) => m.id === meetingId);
+  setForm((prev) => ({
+    ...prev,
+    meetingId,
+    scheduledAt: meetingId && meeting
+      ? toLocalInputValue(new Date(meeting.scheduledDate))
+      : prev.scheduledAt,
+  }));
+}}
+```
+
+---
+
+#### 12. File URL di daftar materi tidak bisa diklik
+**File:** `app/teacher/materials/page.tsx` baris 178
+
+```tsx
+// BEFORE (broken)
+{item.fileUrl && <p className="mt-1 text-sm text-blue-600">Lampiran: {item.fileUrl}</p>}
+
+// AFTER (fixed)
+{item.fileUrl && (
+  <a href={item.fileUrl} target="_blank" rel="noreferrer"
+     className="mt-1 inline-block text-sm text-blue-600 underline hover:text-blue-800 dark:text-blue-400">
+    Buka Lampiran
+  </a>
+)}
+```
+
+---
+
+#### 13. Tidak ada tombol "Salin ke Kelas Lain" untuk materi yang sudah ada
+**File:** `app/teacher/materials/page.tsx`
+
+**Masalah:** Saat create multi-class, sistem membuat N salinan independen (benar). Tapi setelah materi dibuat, tidak ada cara mendistribusikan materi yang sudah ada ke kelas lain.
+
+**Solusi:** Tambahkan tombol `Copy` (ikon dari lucide-react) di setiap material card:
+- Klik → mini-modal dengan daftar kelas lain yang diampu teacher (exclude kelas sumber)
+- Pilih kelas tujuan (checkbox multi-select)
+- Submit → panggil `createMaterial()` dengan `classIds` = kelas tujuan, salin `title, content, fileUrl, scheduledAt`
+- `meetingId` tidak disalin (meeting spesifik per kelas)
+
+**Action yang digunakan:** `createMaterial()` yang sudah ada, tidak perlu action baru.
+
+---
+
+#### 14. Konten materi tidak terlihat di daftar
+**File:** `app/teacher/materials/page.tsx`
+
+**Solusi:** Tampilkan 2 baris pertama konten (truncated) di card:
+```tsx
+{item.content && (
+  <p className="mt-1 text-sm text-slate-600 dark:text-slate-300 line-clamp-2">{item.content}</p>
+)}
+```
+
+---
+
+#### 15. Materi tidak dikelompokkan per kelas (flat list)
+**File:** `app/teacher/materials/page.tsx`
+
+**Solusi:** Group materials by `className` menggunakan `useMemo`:
+```ts
+const groupedMaterials = useMemo(() => {
+  const map = new Map<string, MaterialItem[]>();
+  rows.forEach((item) => {
+    if (!map.has(item.className)) map.set(item.className, []);
+    map.get(item.className)!.push(item);
+  });
+  return map;
+}, [rows]);
+```
+
+Render per group dengan header nama kelas sebagai section divider.
+
+---
+
+### Alur Teacher Materials yang Benar
+
+```
+DOSEN — Materi Saya (/teacher/materials)
+  ├─ Tambah Materi
+  │   ├─ Pilih 1 kelas + pilih pertemuan → scheduledAt auto-fill → simpan
+  │   └─ Pilih N kelas → set scheduledAt manual → simpan (N salinan dibuat)
+  ├─ Edit Materi → hanya ubah 1 salinan kelas itu
+  ├─ Hapus Materi → hapus 1 salinan kelas itu
+  └─ Salin ke Kelas Lain → duplikasi ke kelas lain yang diampu ← MISSING
+```

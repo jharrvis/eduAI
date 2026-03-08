@@ -6,7 +6,7 @@ import { getMeetings } from "@/app/actions/class-meetings";
 import { getMaterials } from "@/app/actions/materials";
 import { Loader2, Plus, Save, X } from "lucide-react";
 
-type MaterialItem = { id: string; className: string; title: string };
+type MaterialItem = { id: string; classId: string; className: string; title: string };
 type MeetingItem = { id: string; classId: string; meetingNumber: number; title: string };
 type AssignmentItem = {
   id: string;
@@ -40,6 +40,7 @@ export default function TeacherAssignmentsPage() {
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string>("");
   const [submissions, setSubmissions] = useState<SubmissionItem[]>([]);
   const [gradeMap, setGradeMap] = useState<Record<string, string>>({});
+  const [savedMap, setSavedMap] = useState<Record<string, boolean>>({});
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -57,6 +58,13 @@ export default function TeacherAssignmentsPage() {
     [assignments, selectedAssignmentId],
   );
 
+  const materialsByMeetingClass = useMemo(() => {
+    if (!form.meetingId) return materials;
+    const meeting = meetings.find((m) => m.id === form.meetingId);
+    if (!meeting) return materials;
+    return materials.filter((m) => m.classId === meeting.classId);
+  }, [form.meetingId, meetings, materials]);
+
   const loadData = () => {
     startTransition(async () => {
       try {
@@ -67,6 +75,7 @@ export default function TeacherAssignmentsPage() {
         setMaterials(
           (materialRows as Array<{ id: string; className: string; title: string; classId: string }>).map((item) => ({
             id: item.id,
+            classId: item.classId,
             className: item.className,
             title: item.title,
           })),
@@ -172,7 +181,11 @@ export default function TeacherAssignmentsPage() {
                     </div>
 
                     {submission.answerText && <p className="mb-2 whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-900">{submission.answerText}</p>}
-                    {submission.fileUrl && <p className="mb-2 text-sm text-blue-600 dark:text-blue-400">Lampiran: {submission.fileUrl}</p>}
+                    {submission.fileUrl && (
+                      <a href={submission.fileUrl} target="_blank" rel="noreferrer" className="mb-2 inline-block text-sm text-blue-600 underline dark:text-blue-400">
+                        Buka Lampiran
+                      </a>
+                    )}
 
                     <div className="flex flex-wrap items-center gap-2">
                       <input
@@ -194,6 +207,7 @@ export default function TeacherAssignmentsPage() {
                           startTransition(async () => {
                             try {
                               await overrideGrade(submission.id, val);
+                              setSavedMap((prev) => ({ ...prev, [submission.id]: true }));
                               await loadSubmissions(selectedAssignment.id);
                             } catch (err) {
                               setError(err instanceof Error ? err.message : "Gagal memperbarui nilai.");
@@ -204,6 +218,9 @@ export default function TeacherAssignmentsPage() {
                         {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                         Simpan Nilai
                       </button>
+                      {savedMap[submission.id] && (
+                        <span className="text-xs text-emerald-600 dark:text-emerald-400">Nilai tersimpan.</span>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -233,15 +250,15 @@ export default function TeacherAssignmentsPage() {
               className="space-y-4"
               onSubmit={(e) => {
                 e.preventDefault();
-                if (!form.materialId || !form.title.trim() || !form.dueDate) {
-                  setError("Materi, judul, dan tenggat wajib diisi.");
+                if ((!form.materialId && !form.meetingId) || !form.title.trim() || !form.dueDate) {
+                  setError("Pilih materi atau pertemuan, lalu isi judul dan tenggat.");
                   return;
                 }
 
                 startTransition(async () => {
                   try {
                     await createAssignment({
-                      materialId: form.materialId,
+                      materialId: form.materialId || undefined,
                       meetingId: form.meetingId || undefined,
                       title: form.title,
                       instructions: form.instructions,
@@ -257,10 +274,10 @@ export default function TeacherAssignmentsPage() {
               }}
             >
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Materi</label>
-                <select className="app-input" value={form.materialId} onChange={(e) => setForm((prev) => ({ ...prev, materialId: e.target.value }))} required>
-                  <option value="" disabled>Pilih materi</option>
-                  {materials.map((m) => (
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Materi (Opsional jika sudah pilih Pertemuan)</label>
+                <select className="app-input" value={form.materialId} onChange={(e) => setForm((prev) => ({ ...prev, materialId: e.target.value }))}>
+                  <option value="">Tanpa materi</option>
+                  {materialsByMeetingClass.map((m) => (
                     <option key={m.id} value={m.id}>{m.className} - {m.title}</option>
                   ))}
                 </select>
