@@ -5,7 +5,10 @@ import { admin } from "better-auth/plugins";
 import { db } from "@/lib/db";
 import * as authSchema from "@/lib/auth-schema";
 
-const authUrl = process.env.BETTER_AUTH_URL || "http://localhost:3000";
+const resolvedAuthUrl =
+  process.env.BETTER_AUTH_URL ||
+  process.env.NEXT_PUBLIC_BETTER_AUTH_URL ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
 const authSecret =
   process.env.BETTER_AUTH_SECRET || "dev-only-secret-change-before-production";
 
@@ -15,10 +18,10 @@ export const auth = betterAuth({
     provider: "pg",
     schema: authSchema,
   }),
-  baseURL: authUrl,
+  baseURL: resolvedAuthUrl,
   trustedOrigins: async (request) => {
-    const requestOrigin = request ? new URL(request.url).origin : authUrl;
-    return [requestOrigin, authUrl];
+    const requestOrigin = request ? new URL(request.url).origin : resolvedAuthUrl;
+    return Array.from(new Set([requestOrigin, resolvedAuthUrl]));
   },
   emailAndPassword: {
     enabled: true,

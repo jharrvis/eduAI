@@ -223,6 +223,51 @@ export async function getClassEnrollments(classId: string) {
     .where(eq(enrollments.classId, classId));
 }
 
+export async function getTeacherClassById(classId: string) {
+  const session = await requireRole(["ADMIN", "TEACHER"]);
+
+  if (session.user.role === "TEACHER") {
+    const isEnrolled = await db
+      .select({ id: enrollments.id })
+      .from(enrollments)
+      .where(
+        and(
+          eq(enrollments.classId, classId),
+          eq(enrollments.userId, session.user.id),
+          eq(enrollments.roleInClass, "TEACHER"),
+        ),
+      )
+      .limit(1);
+
+    if (!isEnrolled[0]) throw new Error("FORBIDDEN");
+  }
+
+  const classRow = await db.select().from(classes).where(eq(classes.id, classId)).limit(1);
+  if (!classRow[0]) throw new Error("Kelas tidak ditemukan.");
+
+  const members = await db
+    .select({
+      classId: enrollments.classId,
+      roleInClass: enrollments.roleInClass,
+      userId: user.id,
+      name: user.name,
+      email: user.email,
+    })
+    .from(enrollments)
+    .innerJoin(user, eq(enrollments.userId, user.id))
+    .where(eq(enrollments.classId, classId));
+
+  return {
+    ...classRow[0],
+    teachers: members
+      .filter((m) => m.roleInClass === "TEACHER")
+      .map((m) => ({ userId: m.userId, name: m.name, email: m.email })),
+    students: members
+      .filter((m) => m.roleInClass === "STUDENT")
+      .map((m) => ({ userId: m.userId, name: m.name, email: m.email })),
+  };
+}
+
 export async function getStudentClassById(classId: string) {
   const session = await requireRole(["STUDENT"]);
 
