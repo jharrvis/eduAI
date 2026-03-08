@@ -6,12 +6,12 @@ import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 
 const navItems: ShellNavItem[] = [
-  { name: "Dashboard", href: "/teacher/dashboard", icon: LayoutDashboard },
-  { name: "Classes", href: "/teacher/classes", icon: Calendar },
-  { name: "Materials", href: "/teacher/materials", icon: BookOpen },
-  { name: "Assignments", href: "/teacher/assignments", icon: ClipboardCheck },
-  { name: "Students", href: "/teacher/students", icon: Users },
-  { name: "Reset Password", href: "/teacher/reset-password", icon: KeyRound },
+  { name: "Dasbor", href: "/teacher/dashboard", icon: LayoutDashboard },
+  { name: "Kelas", href: "/teacher/classes", icon: Calendar },
+  { name: "Materi", href: "/teacher/materials", icon: BookOpen },
+  { name: "Tugas", href: "/teacher/assignments", icon: ClipboardCheck },
+  { name: "Mahasiswa/Siswa", href: "/teacher/students", icon: Users },
+  { name: "Reset Kata Sandi", href: "/teacher/reset-password", icon: KeyRound },
 ];
 
 export default function TeacherLayout({
@@ -29,8 +29,9 @@ export default function TeacherLayout({
 
   return (
     <AppShell
-      brand="EduFlow Teacher"
+      brand="EduFlow Dosen/Guru"
       userName={session.user.name || session.user.email}
+      profileHref="/teacher/profile"
       navItems={navItems}
       onLogout={async () => {
         await authClient.signOut();

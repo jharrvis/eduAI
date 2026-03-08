@@ -21,6 +21,7 @@ function revalidateClassPages() {
   revalidatePath("/admin/classes");
   revalidatePath("/teacher/classes");
   revalidatePath("/student/dashboard");
+  revalidatePath("/student/classes");
 }
 
 async function listClassesByRole(userId: string, role: AppRole): Promise<ClassItem[]> {
@@ -86,6 +87,9 @@ export async function createClass(data: {
   name: string;
   description?: string;
   academicYear: string;
+  isActive?: boolean;
+  startDate?: string;
+  endDate?: string;
 }) {
   await requireRole(["ADMIN"]);
 
@@ -95,6 +99,9 @@ export async function createClass(data: {
       name: data.name,
       description: data.description,
       academicYear: data.academicYear,
+      isActive: data.isActive ?? true,
+      startDate: data.startDate ? new Date(data.startDate) : null,
+      endDate: data.endDate ? new Date(data.endDate) : null,
     })
     .returning({ id: classes.id });
 
@@ -104,11 +111,27 @@ export async function createClass(data: {
 
 export async function updateClass(
   id: string,
-  data: Partial<{ name: string; description: string; academicYear: string }>,
+  data: Partial<{
+    name: string;
+    description: string;
+    academicYear: string;
+    isActive: boolean;
+    startDate: string | null;
+    endDate: string | null;
+  }>,
 ) {
   await requireRole(["ADMIN"]);
 
-  await db.update(classes).set(data).where(eq(classes.id, id));
+  const payload: Partial<typeof classes.$inferInsert> = {};
+  if (data.name !== undefined) payload.name = data.name;
+  if (data.description !== undefined) payload.description = data.description;
+  if (data.academicYear !== undefined) payload.academicYear = data.academicYear;
+  if (data.isActive !== undefined) payload.isActive = data.isActive;
+  if (data.startDate !== undefined) payload.startDate = data.startDate ? new Date(data.startDate) : null;
+  if (data.endDate !== undefined) payload.endDate = data.endDate ? new Date(data.endDate) : null;
+
+  if (Object.keys(payload).length === 0) return;
+  await db.update(classes).set(payload).where(eq(classes.id, id));
   revalidateClassPages();
 }
 
@@ -175,4 +198,29 @@ export async function getClassEnrollments(classId: string) {
     .from(enrollments)
     .innerJoin(user, eq(enrollments.userId, user.id))
     .where(eq(enrollments.classId, classId));
+}
+
+export async function getStudentClassById(classId: string) {
+  const session = await requireRole(["STUDENT"]);
+
+  const isEnrolled = await db
+    .select({ id: enrollments.id })
+    .from(enrollments)
+    .where(
+      and(
+        eq(enrollments.classId, classId),
+        eq(enrollments.userId, session.user.id),
+        eq(enrollments.roleInClass, "STUDENT"),
+      ),
+    )
+    .limit(1);
+
+  if (!isEnrolled[0]) {
+    throw new Error("FORBIDDEN");
+  }
+
+  const classRow = await db.select().from(classes).where(eq(classes.id, classId)).limit(1);
+  if (!classRow[0]) throw new Error("Kelas tidak ditemukan.");
+
+  return classRow[0];
 }

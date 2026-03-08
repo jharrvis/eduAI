@@ -1,14 +1,16 @@
 "use client";
 
-import { Calendar, LayoutDashboard, Users } from "lucide-react";
+import { BookOpenText, Calendar, DoorOpen, LayoutDashboard, Users } from "lucide-react";
 import AppShell, { type ShellNavItem } from "@/app/components/app-shell";
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 
 const navItems: ShellNavItem[] = [
-  { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
-  { name: "User Management", href: "/admin/students", icon: Users },
-  { name: "Class Management", href: "/admin/classes", icon: Calendar },
+  { name: "Dasbor", href: "/admin/dashboard", icon: LayoutDashboard },
+  { name: "Manajemen Pengguna", href: "/admin/students", icon: Users },
+  { name: "Manajemen Kelas", href: "/admin/classes", icon: Calendar },
+  { name: "Ruang Kelas", href: "/admin/classrooms", icon: DoorOpen },
+  { name: "Master Jurusan", href: "/admin/majors", icon: BookOpenText },
 ];
 
 export default function AdminLayout({
@@ -28,6 +30,7 @@ export default function AdminLayout({
     <AppShell
       brand="EduFlow Admin"
       userName={session.user.name || session.user.email}
+      profileHref="/admin/profile"
       navItems={navItems}
       onLogout={async () => {
         await authClient.signOut();

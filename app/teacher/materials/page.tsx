@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { getClasses } from "@/app/actions/classes";
+import { getMeetings } from "@/app/actions/class-meetings";
 import { createMaterial, deleteMaterial, getMaterials, updateMaterial } from "@/app/actions/materials";
 import FileUpload from "@/app/components/file-upload";
 import { Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
@@ -11,14 +12,19 @@ type MaterialItem = {
   id: string;
   classId: string;
   className: string;
+  meetingId: string | null;
+  meetingTitle: string | null;
+  meetingNumber: number | null;
   title: string;
   content: string | null;
   fileUrl: string | null;
   scheduledAt: Date;
 };
+type MeetingItem = { id: string; title: string; meetingNumber: number };
 
 type MaterialForm = {
   classId: string;
+  meetingId: string;
   title: string;
   content: string;
   fileUrl: string;
@@ -33,6 +39,7 @@ function toLocalInputValue(date: Date) {
 
 export default function TeacherMaterialsPage() {
   const [classes, setClasses] = useState<ClassItem[]>([]);
+  const [meetings, setMeetings] = useState<MeetingItem[]>([]);
   const [rows, setRows] = useState<MaterialItem[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -40,6 +47,7 @@ export default function TeacherMaterialsPage() {
   const [isPending, startTransition] = useTransition();
   const [form, setForm] = useState<MaterialForm>({
     classId: "",
+    meetingId: "",
     title: "",
     content: "",
     fileUrl: "",
@@ -52,6 +60,10 @@ export default function TeacherMaterialsPage() {
         const [classRows, materialRows] = await Promise.all([getClasses(), getMaterials()]);
         setClasses(classRows.map((item) => ({ id: item.id, name: item.name })));
         setRows(materialRows as MaterialItem[]);
+        if (classRows[0]) {
+          const meetingRows = await getMeetings(classRows[0].id);
+          setMeetings((meetingRows as MeetingItem[]).map((m) => ({ id: m.id, title: m.title, meetingNumber: m.meetingNumber })));
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Gagal memuat materi.");
       }
@@ -65,7 +77,14 @@ export default function TeacherMaterialsPage() {
   const openCreate = () => {
     setEditingId(null);
     setError(null);
-    setForm({ classId: classes[0]?.id || "", title: "", content: "", fileUrl: "", scheduledAt: "" });
+    const firstClassId = classes[0]?.id || "";
+    setForm({ classId: firstClassId, meetingId: "", title: "", content: "", fileUrl: "", scheduledAt: "" });
+    if (firstClassId) {
+      startTransition(async () => {
+        const meetingRows = await getMeetings(firstClassId);
+        setMeetings((meetingRows as MeetingItem[]).map((m) => ({ id: m.id, title: m.title, meetingNumber: m.meetingNumber })));
+      });
+    }
     setIsModalOpen(true);
   };
 
@@ -74,6 +93,7 @@ export default function TeacherMaterialsPage() {
     setError(null);
     setForm({
       classId: item.classId,
+      meetingId: item.meetingId || "",
       title: item.title,
       content: item.content || "",
       fileUrl: item.fileUrl || "",
@@ -85,7 +105,7 @@ export default function TeacherMaterialsPage() {
   const saveMaterial = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.classId || !form.title.trim() || !form.scheduledAt) {
-      setError("Class, title, dan schedule wajib diisi.");
+      setError("Kelas, judul, dan jadwal wajib diisi.");
       return;
     }
 
@@ -93,6 +113,7 @@ export default function TeacherMaterialsPage() {
       try {
         if (editingId) {
           await updateMaterial(editingId, {
+            meetingId: form.meetingId || null,
             title: form.title,
             content: form.content,
             fileUrl: form.fileUrl,
@@ -101,6 +122,7 @@ export default function TeacherMaterialsPage() {
         } else {
           await createMaterial({
             classId: form.classId,
+            meetingId: form.meetingId || undefined,
             title: form.title,
             content: form.content,
             fileUrl: form.fileUrl,
@@ -120,12 +142,12 @@ export default function TeacherMaterialsPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Teacher Materials</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Materi Dosen/Guru</h1>
           <p className="mt-1 text-slate-500 dark:text-slate-400">Buat dan kelola materi per kelas yang Anda ampu.</p>
         </div>
         <button type="button" onClick={openCreate} className="app-btn-primary" disabled={isPending}>
           <Plus className="h-5 w-5" />
-          Add Material
+          Tambah Materi
         </button>
       </header>
 
@@ -137,7 +159,7 @@ export default function TeacherMaterialsPage() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="font-semibold text-slate-900 dark:text-slate-100">{item.title}</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400">{item.className} • {new Date(item.scheduledAt).toLocaleString()}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{item.className} • {new Date(item.scheduledAt).toLocaleString()} {item.meetingNumber ? `• P${item.meetingNumber}` : ""}</p>
                 {item.fileUrl && <p className="mt-1 text-sm text-blue-600 dark:text-blue-400">Lampiran: {item.fileUrl}</p>}
               </div>
               <div className="flex gap-2">
@@ -171,41 +193,64 @@ export default function TeacherMaterialsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
           <div className="app-card w-full max-w-xl p-6">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{editingId ? "Edit Material" : "Add Material"}</h2>
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{editingId ? "Ubah Materi" : "Tambah Materi"}</h2>
               <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"><X className="h-4 w-4" /></button>
             </div>
 
             <form onSubmit={saveMaterial} className="space-y-4">
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Class</label>
-                <select className="app-input" value={form.classId} onChange={(e) => setForm((prev) => ({ ...prev, classId: e.target.value }))} required>
-                  <option value="" disabled>Pilih class</option>
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Kelas</label>
+                <select
+                  className="app-input"
+                  value={form.classId}
+                  onChange={(e) => {
+                    const nextClassId = e.target.value;
+                    setForm((prev) => ({ ...prev, classId: nextClassId, meetingId: "" }));
+                    startTransition(async () => {
+                      const meetingRows = await getMeetings(nextClassId);
+                      setMeetings((meetingRows as MeetingItem[]).map((m) => ({ id: m.id, title: m.title, meetingNumber: m.meetingNumber })));
+                    });
+                  }}
+                  required
+                >
+                  <option value="" disabled>Pilih kelas</option>
                   {classes.map((item) => (<option key={item.id} value={item.id}>{item.name}</option>))}
                 </select>
               </div>
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Title</label>
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Pertemuan (Opsional)</label>
+                <select
+                  className="app-input"
+                  value={form.meetingId}
+                  onChange={(e) => setForm((prev) => ({ ...prev, meetingId: e.target.value }))}
+                >
+                  <option value="">Tanpa pertemuan</option>
+                  {meetings.map((item) => (<option key={item.id} value={item.id}>P{item.meetingNumber} - {item.title}</option>))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Judul</label>
                 <input className="app-input" value={form.title} onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))} required />
               </div>
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Content</label>
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Konten</label>
                 <textarea rows={5} className="app-input" value={form.content} onChange={(e) => setForm((prev) => ({ ...prev, content: e.target.value }))} />
               </div>
               <FileUpload
-                label="Lampiran Materi (Optional)"
+                label="Lampiran Materi (Opsional)"
                 scope="materials"
                 value={form.fileUrl}
                 onChange={(fileUrl) => setForm((prev) => ({ ...prev, fileUrl }))}
                 disabled={isPending}
               />
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Scheduled At</label>
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Jadwal Tayang</label>
                 <input type="datetime-local" className="app-input" value={form.scheduledAt} onChange={(e) => setForm((prev) => ({ ...prev, scheduledAt: e.target.value }))} required />
               </div>
 
               <div className="flex justify-end gap-2">
-                <button type="button" className="app-btn-ghost" onClick={() => setIsModalOpen(false)}>Cancel</button>
-                <button type="submit" className="app-btn-primary" disabled={isPending}>{isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{editingId ? "Update" : "Save"}</button>
+                <button type="button" className="app-btn-ghost" onClick={() => setIsModalOpen(false)}>Batal</button>
+                <button type="submit" className="app-btn-primary" disabled={isPending}>{isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{editingId ? "Perbarui" : "Simpan"}</button>
               </div>
             </form>
           </div>

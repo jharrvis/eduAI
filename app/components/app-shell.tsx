@@ -9,6 +9,7 @@ import {
   GraduationCap,
   LogOut,
   Moon,
+  User,
   Search,
   Sun,
   type LucideIcon,
@@ -49,6 +50,7 @@ export interface ShellNavItem {
 interface AppShellProps {
   brand: string;
   userName: string;
+  profileHref: string;
   navItems: ShellNavItem[];
   onLogout: () => void;
   children: React.ReactNode;
@@ -57,6 +59,7 @@ interface AppShellProps {
 export default function AppShell({
   brand,
   userName,
+  profileHref,
   navItems,
   onLogout,
   children,
@@ -123,7 +126,7 @@ export default function AppShell({
             onClick={onLogout}
           >
             <LogOut className="h-4 w-4" />
-            <span>Logout</span>
+            <span>Keluar</span>
           </Button>
         </SidebarFooter>
         <SidebarRail />
@@ -142,11 +145,11 @@ export default function AppShell({
               <Input className="w-64 pl-9" placeholder="Cari..." />
             </div>
 
-            <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme">
+            <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Ganti tema">
               {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
 
-            <Button variant="ghost" size="icon" aria-label="Notifications" className="relative">
+            <Button variant="ghost" size="icon" aria-label="Notifikasi" className="relative">
               <Bell className="h-4 w-4" />
               <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500" />
             </Button>
@@ -166,16 +169,22 @@ export default function AppShell({
                   <p className="truncate text-xs text-muted-foreground">{brand}</p>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href={profileHref}>
+                    <User className="mr-2 h-4 w-4" />
+                    Profil Saya
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={toggleTheme}>
                   {isDark ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
-                  {isDark ? "Light mode" : "Dark mode"}
+                  {isDark ? "Mode terang" : "Mode gelap"}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={onLogout}
                   className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
                 >
                   <LogOut className="mr-2 h-4 w-4" />
-                  Logout
+                  Keluar
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

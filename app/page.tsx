@@ -44,7 +44,7 @@ function LoginPageContent() {
   }, [isSessionPending, router, session]);
 
   const formTitle = useMemo(
-    () => (mode === "signin" ? "Sign In" : "Create Account"),
+    () => (mode === "signin" ? "Masuk" : "Buat Akun"),
     [mode],
   );
   const isFormInvalid =
@@ -77,7 +77,7 @@ function LoginPageContent() {
         );
 
         if (signUpResult.error) {
-          setErrorMessage(signUpResult.error.message || "Sign up gagal.");
+          setErrorMessage(signUpResult.error.message || "Pendaftaran gagal.");
           return;
         }
       } else {
@@ -120,7 +120,7 @@ function LoginPageContent() {
             Better Auth + Neon + Drizzle
           </div>
           <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-5xl">
-            EduFlow Learning Studio
+            EduFlow Studio Pembelajaran
           </h1>
           <p className="max-w-lg text-base leading-relaxed text-slate-600 dark:text-slate-300">
             Login menggunakan email/password yang tersimpan di Neon PostgreSQL
@@ -157,7 +157,7 @@ function LoginPageContent() {
                     : "text-slate-500 dark:text-slate-400"
                 }`}
               >
-                Sign In
+                Masuk
               </button>
               <button
                 type="button"
@@ -168,7 +168,7 @@ function LoginPageContent() {
                     : "text-slate-500 dark:text-slate-400"
                 }`}
               >
-                Sign Up
+                Daftar
               </button>
             </div>
 
@@ -184,7 +184,7 @@ function LoginPageContent() {
               {mode === "signup" && (
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">
-                    Full Name
+                    Nama Lengkap
                   </label>
                   <input
                     type="text"
@@ -213,7 +213,7 @@ function LoginPageContent() {
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Password
+                  Kata Sandi
                 </label>
                 <input
                   type="password"

@@ -12,7 +12,7 @@ interface FileUploadProps {
 }
 
 export default function FileUpload({
-  label = "Upload File",
+  label = "Unggah Berkas",
   scope,
   value,
   onChange,
@@ -38,12 +38,12 @@ export default function FileUpload({
 
       const json = (await response.json()) as { fileUrl?: string; error?: string };
       if (!response.ok || !json.fileUrl) {
-        throw new Error(json.error || "Upload gagal.");
+        throw new Error(json.error || "Unggah gagal.");
       }
 
       onChange(json.fileUrl);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload gagal.");
+      setError(err instanceof Error ? err.message : "Unggah gagal.");
     } finally {
       setIsUploading(false);
       if (inputRef.current) {
@@ -71,7 +71,7 @@ export default function FileUpload({
         {isUploading && (
           <span className="inline-flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Uploading...
+            Sedang mengunggah...
           </span>
         )}
       </div>
@@ -99,4 +99,3 @@ export default function FileUpload({
     </div>
   );
 }
-

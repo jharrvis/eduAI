@@ -19,7 +19,7 @@ export default function TeacherStudentsPage() {
         const rows = await getStudents();
         setStudents(rows);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Gagal memuat data student.");
+        setError(err instanceof Error ? err.message : "Gagal memuat data mahasiswa/siswa.");
       }
     });
   }, []);
@@ -47,7 +47,7 @@ export default function TeacherStudentsPage() {
     <div className="space-y-6">
       <header>
         <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-          Students
+          Mahasiswa/Siswa
         </h1>
         <p className="mt-2 text-slate-500 dark:text-slate-400">
           Read-only data mahasiswa/siswa.
@@ -119,7 +119,7 @@ export default function TeacherStudentsPage() {
 
         <div className="mt-4 flex items-center justify-between">
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Page {safeCurrentPage} of {totalPages}
+            Halaman {safeCurrentPage} dari {totalPages}
           </p>
           <div className="flex items-center gap-2">
             <button

@@ -10,6 +10,9 @@ type MaterialItem = {
   id: string;
   classId: string;
   className: string;
+  meetingId: string | null;
+  meetingTitle: string | null;
+  meetingNumber: number | null;
   title: string;
   content: string | null;
   fileUrl: string | null;
@@ -71,7 +74,7 @@ export default function StudentMaterialsPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">My Materials</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Materi Saya</h1>
         <p className="mt-2 text-slate-500 dark:text-slate-400">Materi tampil sesuai jadwal rilis dari dosen/admin.</p>
       </header>
 
@@ -79,7 +82,7 @@ export default function StudentMaterialsPage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="app-card p-4 lg:col-span-1">
-          <h2 className="mb-3 text-base font-semibold">Materials</h2>
+          <h2 className="mb-3 text-base font-semibold">Materi</h2>
           <div className="space-y-2">
             {materials.map((item) => (
               <button
@@ -93,7 +96,7 @@ export default function StudentMaterialsPage() {
                 className={`w-full rounded-xl p-3 text-left transition ${selectedMaterialId === item.id ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : "bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800"}`}
               >
                 <p className="font-medium">{item.title}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">{item.className}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{item.className}{item.meetingNumber ? ` • P${item.meetingNumber}` : ""}</p>
               </button>
             ))}
             {materials.length === 0 && (
@@ -109,7 +112,7 @@ export default function StudentMaterialsPage() {
             <div className="space-y-6">
               <div>
                 <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{selectedMaterial.title}</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400">{selectedMaterial.className} • {new Date(selectedMaterial.scheduledAt).toLocaleString()}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{selectedMaterial.className} • {new Date(selectedMaterial.scheduledAt).toLocaleString()} {selectedMaterial.meetingNumber ? `• Pertemuan ${selectedMaterial.meetingNumber}` : ""}</p>
               </div>
 
               <div className="rounded-xl bg-slate-50 p-4 dark:bg-slate-900">
@@ -118,13 +121,13 @@ export default function StudentMaterialsPage() {
               </div>
 
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Assignments</h3>
+                <h3 className="text-lg font-semibold">Tugas</h3>
                 {materialAssignments.length > 0 ? (
                   materialAssignments.map((assignment) => (
                     <div key={assignment.id} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
                       <div className="mb-2 flex items-center justify-between gap-2">
                         <p className="font-semibold text-slate-900 dark:text-slate-100">{assignment.title}</p>
-                        <span className="text-xs text-slate-500 dark:text-slate-400">Due: {new Date(assignment.dueDate).toLocaleString()}</span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">Tenggat: {new Date(assignment.dueDate).toLocaleString()}</span>
                       </div>
                       {assignment.instructions && <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">{assignment.instructions}</p>}
 
@@ -140,10 +143,10 @@ export default function StudentMaterialsPage() {
                             className="app-input"
                             value={answerText}
                             onChange={(e) => setAnswerText(e.target.value)}
-                            placeholder="Tulis jawaban assignment di sini"
+                            placeholder="Tulis jawaban tugas di sini"
                           />
                           <FileUpload
-                            label="Lampiran Tugas (Optional)"
+                            label="Lampiran Tugas (Opsional)"
                             scope="submissions"
                             value={submissionFileUrl}
                             onChange={setSubmissionFileUrl}
@@ -164,12 +167,12 @@ export default function StudentMaterialsPage() {
                                   setSubmissionFileUrl("");
                                   await loadData();
                                 } catch (err) {
-                                  setError(err instanceof Error ? err.message : "Gagal submit assignment.");
+                                  setError(err instanceof Error ? err.message : "Gagal mengumpulkan tugas.");
                                 }
                               });
                             }}
                           >
-                            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}Submit Assignment
+                            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}Kumpulkan Tugas
                           </button>
                         </div>
                       )}
@@ -178,7 +181,7 @@ export default function StudentMaterialsPage() {
                 ) : (
                   <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
                     <BookOpen className="mx-auto mb-2 h-5 w-5" />
-                    Belum ada assignment untuk materi ini.
+                    Belum ada tugas untuk materi ini.
                   </div>
                 )}
               </div>

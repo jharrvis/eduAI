@@ -30,15 +30,15 @@ export default function TeacherResetPasswordPage() {
 
       const data = await res.json();
       if (!res.ok) {
-        setError(data?.message || "Gagal reset password.");
+        setError(data?.message || "Gagal reset kata sandi.");
         return;
       }
 
-      setSuccess(`Password untuk ${email} berhasil direset.`);
+      setSuccess(`Kata sandi untuk ${email} berhasil direset.`);
       setEmail("");
       setNewPassword("");
     } catch {
-      setError("Terjadi kesalahan saat reset password.");
+      setError("Terjadi kesalahan saat reset kata sandi.");
     } finally {
       setIsSubmitting(false);
     }
@@ -48,10 +48,10 @@ export default function TeacherResetPasswordPage() {
     <div className="space-y-6">
       <header>
         <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-          Reset Password User
+          Reset Kata Sandi Pengguna
         </h1>
         <p className="mt-2 text-slate-500 dark:text-slate-400">
-          Dosen dapat mereset password akun user berdasarkan email.
+          Dosen dapat mereset kata sandi akun pengguna berdasarkan email.
         </p>
       </header>
 
@@ -59,7 +59,7 @@ export default function TeacherResetPasswordPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">
-              Email User
+              Email Pengguna
             </label>
             <input
               type="email"
@@ -73,7 +73,7 @@ export default function TeacherResetPasswordPage() {
 
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">
-              Password Baru
+              Kata Sandi Baru
             </label>
             <input
               type="text"
@@ -104,7 +104,7 @@ export default function TeacherResetPasswordPage() {
             className="app-btn-primary"
           >
             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-            Reset Password
+            Reset Kata Sandi
           </button>
         </form>
       </div>

@@ -93,7 +93,7 @@ export default function AdminMaterialsPage() {
   const saveMaterial = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.classId || !form.title.trim() || !form.scheduledAt) {
-      setError("Class, title, dan schedule wajib diisi.");
+      setError("Kelas, judul, dan jadwal wajib diisi.");
       return;
     }
 
@@ -128,12 +128,12 @@ export default function AdminMaterialsPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Materials</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Materi</h1>
           <p className="mt-1 text-slate-500 dark:text-slate-400">Kelola materi dan jadwal tayang (`scheduledAt`).</p>
         </div>
         <button type="button" onClick={openCreate} className="app-btn-primary" disabled={isPending}>
           <Plus className="h-5 w-5" />
-          Add Material
+          Tambah Materi
         </button>
       </header>
 
@@ -150,7 +150,7 @@ export default function AdminMaterialsPage() {
                     <div>
                       <h3 className="font-semibold text-slate-900 dark:text-slate-100">{item.title}</h3>
                       <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Tayang: {new Date(item.scheduledAt).toLocaleString()}</p>
-                      {item.fileUrl && <p className="mt-1 text-sm text-blue-600 dark:text-blue-400">File: {item.fileUrl}</p>}
+                      {item.fileUrl && <p className="mt-1 text-sm text-blue-600 dark:text-blue-400">Berkas: {item.fileUrl}</p>}
                     </div>
                     <div className="flex gap-2">
                       <button type="button" onClick={() => openEdit(item)} className="rounded-lg p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"><Pencil className="h-4 w-4" /></button>
@@ -186,41 +186,41 @@ export default function AdminMaterialsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
           <div className="app-card w-full max-w-xl p-6">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{editingId ? "Edit Material" : "Add Material"}</h2>
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{editingId ? "Ubah Materi" : "Tambah Materi"}</h2>
               <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"><X className="h-4 w-4" /></button>
             </div>
 
             <form onSubmit={saveMaterial} className="space-y-4">
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Class</label>
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Kelas</label>
                 <select className="app-input" value={form.classId} onChange={(e) => setForm((prev) => ({ ...prev, classId: e.target.value }))} required>
-                  <option value="" disabled>Pilih class</option>
+                  <option value="" disabled>Pilih kelas</option>
                   {classes.map((item) => (<option key={item.id} value={item.id}>{item.name}</option>))}
                 </select>
               </div>
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Title</label>
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Judul</label>
                 <input className="app-input" value={form.title} onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))} required />
               </div>
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Content</label>
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Konten</label>
                 <textarea rows={5} className="app-input" value={form.content} onChange={(e) => setForm((prev) => ({ ...prev, content: e.target.value }))} />
               </div>
               <FileUpload
-                label="Lampiran Materi (Optional)"
+                label="Lampiran Materi (Opsional)"
                 scope="materials"
                 value={form.fileUrl}
                 onChange={(fileUrl) => setForm((prev) => ({ ...prev, fileUrl }))}
                 disabled={isPending}
               />
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Scheduled At</label>
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Jadwal Tayang</label>
                 <input type="datetime-local" className="app-input" value={form.scheduledAt} onChange={(e) => setForm((prev) => ({ ...prev, scheduledAt: e.target.value }))} required />
               </div>
 
               <div className="flex justify-end gap-2">
-                <button type="button" className="app-btn-ghost" onClick={() => setIsModalOpen(false)}>Cancel</button>
-                <button type="submit" className="app-btn-primary" disabled={isPending}>{isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{editingId ? "Update" : "Save"}</button>
+                <button type="button" className="app-btn-ghost" onClick={() => setIsModalOpen(false)}>Batal</button>
+                <button type="submit" className="app-btn-primary" disabled={isPending}>{isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{editingId ? "Perbarui" : "Simpan"}</button>
               </div>
             </form>
           </div>

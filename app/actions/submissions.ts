@@ -4,7 +4,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/app/actions/_auth";
 import { db } from "@/lib/db";
-import { assignments, classes, enrollments, materials, submissions } from "@/lib/schema";
+import { assignments, classMeetings, classes, enrollments, materials, submissions } from "@/lib/schema";
 
 export async function getMySubmissions() {
   const session = await requireRole(["STUDENT"]);
@@ -22,15 +22,26 @@ export async function getMySubmissions() {
       dueDate: assignments.dueDate,
       assignmentTitle: assignments.title,
       materialTitle: materials.title,
-      className: classes.name,
-      classId: classes.id,
+      materialClassName: classes.name,
+      materialClassId: classes.id,
+      meetingClassId: classMeetings.classId,
+      meetingTitle: classMeetings.title,
+      meetingNumber: classMeetings.meetingNumber,
     })
     .from(submissions)
     .innerJoin(assignments, eq(submissions.assignmentId, assignments.id))
-    .innerJoin(materials, eq(assignments.materialId, materials.id))
-    .innerJoin(classes, eq(materials.classId, classes.id))
+    .leftJoin(materials, eq(assignments.materialId, materials.id))
+    .leftJoin(classes, eq(materials.classId, classes.id))
+    .leftJoin(classMeetings, eq(assignments.meetingId, classMeetings.id))
     .where(eq(submissions.studentId, session.user.id))
-    .orderBy(asc(assignments.dueDate));
+    .orderBy(asc(assignments.dueDate))
+    .then((rows) =>
+      rows.map((row) => ({
+        ...row,
+        classId: row.materialClassId || row.meetingClassId,
+        className: row.materialClassName || "-",
+      })),
+    );
 }
 
 export async function getAssignmentsWithMySubmission(classId?: string) {
@@ -48,22 +59,35 @@ export async function getAssignmentsWithMySubmission(classId?: string) {
     .select({
       id: assignments.id,
       materialId: assignments.materialId,
+      meetingId: assignments.meetingId,
       title: assignments.title,
       instructions: assignments.instructions,
       dueDate: assignments.dueDate,
-      classId: materials.classId,
+      materialClassId: materials.classId,
+      meetingClassId: classMeetings.classId,
       className: classes.name,
+      meetingTitle: classMeetings.title,
+      meetingNumber: classMeetings.meetingNumber,
       materialTitle: materials.title,
     })
     .from(assignments)
-    .innerJoin(materials, eq(assignments.materialId, materials.id))
-    .innerJoin(classes, eq(materials.classId, classes.id))
-    .where(
-      classId
-        ? and(inArray(materials.classId, classIds), eq(materials.classId, classId))
-        : inArray(materials.classId, classIds),
-    )
-    .orderBy(asc(assignments.dueDate));
+    .leftJoin(materials, eq(assignments.materialId, materials.id))
+    .leftJoin(classes, eq(materials.classId, classes.id))
+    .leftJoin(classMeetings, eq(assignments.meetingId, classMeetings.id))
+    .orderBy(asc(assignments.dueDate))
+    .then((rows) =>
+      rows
+        .map((row) => ({
+          ...row,
+          classId: row.materialClassId || row.meetingClassId,
+        }))
+        .filter((row) => {
+          if (!row.classId) return false;
+          if (!classIds.includes(row.classId)) return false;
+          if (classId && row.classId !== classId) return false;
+          return true;
+        }),
+    );
 
   if (assignmentRows.length === 0) return [];
 
@@ -94,6 +118,33 @@ export async function submitAssignment(
   payload: { answerText: string; fileUrl?: string },
 ) {
   const session = await requireRole(["STUDENT"]);
+
+  const assignmentRow = await db
+    .select({
+      materialClassId: materials.classId,
+      meetingClassId: classMeetings.classId,
+    })
+    .from(assignments)
+    .leftJoin(materials, eq(assignments.materialId, materials.id))
+    .leftJoin(classMeetings, eq(assignments.meetingId, classMeetings.id))
+    .where(eq(assignments.id, assignmentId))
+    .limit(1);
+
+  const classId = assignmentRow[0]?.materialClassId || assignmentRow[0]?.meetingClassId;
+  if (!classId) throw new Error("Assignment tidak valid.");
+
+  const isEnrolled = await db
+    .select({ id: enrollments.id })
+    .from(enrollments)
+    .where(
+      and(
+        eq(enrollments.classId, classId),
+        eq(enrollments.userId, session.user.id),
+        eq(enrollments.roleInClass, "STUDENT"),
+      ),
+    )
+    .limit(1);
+  if (!isEnrolled[0]) throw new Error("FORBIDDEN");
 
   const existing = await db
     .select({ id: submissions.id })

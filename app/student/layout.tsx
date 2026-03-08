@@ -1,15 +1,16 @@
 "use client";
 
-import { BookOpen, CheckCircle, LayoutDashboard, MessageSquare } from "lucide-react";
+import { BookOpen, CheckCircle, LayoutDashboard, MessageSquare, School } from "lucide-react";
 import AppShell, { type ShellNavItem } from "@/app/components/app-shell";
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 
 const navItems: ShellNavItem[] = [
-  { name: "Dashboard", href: "/student/dashboard", icon: LayoutDashboard },
-  { name: "My Materials", href: "/student/materials", icon: BookOpen },
-  { name: "Assignments", href: "/student/assignments", icon: CheckCircle },
-  { name: "AI Tutor Chat", href: "/student/chat", icon: MessageSquare },
+  { name: "Dasbor", href: "/student/dashboard", icon: LayoutDashboard },
+  { name: "Kelas", href: "/student/classes", icon: School },
+  { name: "Materi Saya", href: "/student/materials", icon: BookOpen },
+  { name: "Tugas", href: "/student/assignments", icon: CheckCircle },
+  { name: "Chat AI Tutor", href: "/student/chat", icon: MessageSquare },
 ];
 
 export default function StudentLayout({
@@ -27,8 +28,9 @@ export default function StudentLayout({
 
   return (
     <AppShell
-      brand="EduFlow Student"
+      brand="EduFlow Mahasiswa/Siswa"
       userName={session.user.name || session.user.email}
+      profileHref="/student/profile"
       navItems={navItems}
       onLogout={async () => {
         await authClient.signOut();

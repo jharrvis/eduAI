@@ -35,7 +35,7 @@ export async function POST(request: Request) {
 
     if (newPassword.length < 8) {
       return NextResponse.json(
-        { message: "Password minimal 8 karakter." },
+        { message: "Kata sandi minimal 8 karakter." },
         { status: 400 },
       );
     }
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       status: true,
-      message: "Password berhasil direset.",
+      message: "Kata sandi berhasil direset.",
     });
   } catch (error) {
     console.error("Reset password error:", error);

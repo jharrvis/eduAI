@@ -64,10 +64,9 @@ export async function POST(request: Request) {
   } catch (error) {
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "Upload gagal.",
+        error: error instanceof Error ? error.message : "Unggah gagal.",
       },
       { status: 500 },
     );
   }
 }
-

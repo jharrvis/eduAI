@@ -10,6 +10,7 @@ import {
   type UserWithProfile,
   updateUser,
 } from "@/app/actions/users";
+import { getMajors } from "@/app/actions/majors";
 import {
   ChevronLeft,
   ChevronRight,
@@ -30,13 +31,21 @@ type FormState = {
   email: string;
   password: string;
   nim: string;
-  major: string;
+  majorId: string;
+};
+
+type MajorItem = {
+  id: string;
+  code: string;
+  name: string;
+  isActive: boolean;
 };
 
 const PAGE_SIZE = 10;
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserWithProfile[]>([]);
+  const [majors, setMajors] = useState<MajorItem[]>([]);
   const [roleFilter, setRoleFilter] = useState<"ALL" | UserRole>("ALL");
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -55,14 +64,15 @@ export default function AdminUsersPage() {
     email: "",
     password: "",
     nim: "",
-    major: "",
+    majorId: "",
   });
 
-  const loadUsers = () => {
+  const loadData = () => {
     startTransition(async () => {
       try {
-        const rows = await getUsers();
+        const [rows, majorRows] = await Promise.all([getUsers(), getMajors()]);
         setUsers(rows);
+        setMajors(majorRows as MajorItem[]);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Gagal memuat data user.");
       }
@@ -70,7 +80,7 @@ export default function AdminUsersPage() {
   };
 
   useEffect(() => {
-    loadUsers();
+    loadData();
   }, []);
 
   const filteredUsers = useMemo(() => {
@@ -108,7 +118,7 @@ export default function AdminUsersPage() {
       email: "",
       password: "",
       nim: "",
-      major: "",
+      majorId: "",
     });
     setIsModalOpen(true);
   };
@@ -125,7 +135,7 @@ export default function AdminUsersPage() {
       email: row.email,
       password: "",
       nim: row.nim || "",
-      major: row.major || "",
+      majorId: row.majorId || "",
     });
     setIsModalOpen(true);
   };
@@ -157,7 +167,7 @@ export default function AdminUsersPage() {
     const email = form.email.trim();
     const password = form.password.trim();
     const nim = form.nim.trim();
-    const major = form.major.trim();
+    const majorId = form.majorId.trim();
 
     if (!name) {
       setError("Nama wajib diisi.");
@@ -165,13 +175,13 @@ export default function AdminUsersPage() {
     }
 
     if (role === "STUDENT" && !nim) {
-      setError("NIM wajib diisi untuk student.");
+      setError("NIM wajib diisi untuk mahasiswa/siswa.");
       return;
     }
 
     if (!editingId && role !== "STUDENT") {
       if (!email || !password) {
-        setError("Email dan password wajib diisi untuk ADMIN/TEACHER.");
+        setError("Email dan kata sandi wajib diisi untuk ADMIN/TEACHER.");
         return;
       }
     }
@@ -182,13 +192,13 @@ export default function AdminUsersPage() {
           await createStudent({
             nim,
             name,
-            major: major || undefined,
+            majorId: majorId || undefined,
           });
           closeModal();
           setCurrentPage(1);
-          await loadUsers();
+          await loadData();
         } catch (err) {
-          setError(err instanceof Error ? err.message : "Gagal menambah student.");
+          setError(err instanceof Error ? err.message : "Gagal menambah mahasiswa/siswa.");
         }
       });
       return;
@@ -202,7 +212,7 @@ export default function AdminUsersPage() {
             name,
             email: role === "STUDENT" ? undefined : email,
             nim: role === "STUDENT" ? nim : undefined,
-            major: role === "STUDENT" ? major || undefined : undefined,
+            majorId: role === "STUDENT" ? majorId || undefined : undefined,
           });
         } else {
           await createUser({
@@ -211,13 +221,13 @@ export default function AdminUsersPage() {
             email,
             password,
             nim: role === "STUDENT" ? nim : undefined,
-            major: role === "STUDENT" ? major || undefined : undefined,
+            majorId: role === "STUDENT" ? majorId || undefined : undefined,
           });
         }
 
         closeModal();
         setCurrentPage(1);
-        await loadUsers();
+        await loadData();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Gagal menyimpan user.");
       }
@@ -259,13 +269,13 @@ export default function AdminUsersPage() {
           await bulkCreateStudents(parsed);
           closeBulkModal();
           setCurrentPage(1);
-          await loadUsers();
+          await loadData();
         } catch (err) {
-          setBulkError(err instanceof Error ? err.message : "Bulk insert gagal.");
+          setBulkError(err instanceof Error ? err.message : "Impor massal gagal.");
         }
       });
     } catch (err) {
-      setBulkError(err instanceof Error ? err.message : "Bulk insert gagal.");
+      setBulkError(err instanceof Error ? err.message : "Impor massal gagal.");
     }
   };
 
@@ -273,18 +283,18 @@ export default function AdminUsersPage() {
     <div className="space-y-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">User Management</h1>
-          <p className="mt-1 text-slate-500 dark:text-slate-400">Kelola user role ADMIN, TEACHER, dan STUDENT. Password default student: <span className="font-semibold">Student12345!</span></p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Manajemen Pengguna</h1>
+          <p className="mt-1 text-slate-500 dark:text-slate-400">Kelola pengguna role ADMIN, TEACHER, dan STUDENT. Kata sandi default mahasiswa/siswa: <span className="font-semibold">Student12345!</span></p>
         </div>
 
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={openBulkModal} className="app-btn-ghost" disabled={isPending}>
             <FileUp className="h-5 w-5" />
-            Bulk Student
+            Impor Mahasiswa/Siswa
           </button>
           <button type="button" onClick={openAddModal} className="app-btn-primary" disabled={isPending}>
             <Plus className="h-5 w-5" />
-            Add User
+            Tambah Pengguna
           </button>
         </div>
       </header>
@@ -313,7 +323,7 @@ export default function AdminUsersPage() {
               }}
               className="app-input w-full sm:w-40"
             >
-              <option value="ALL">All Roles</option>
+              <option value="ALL">Semua Role</option>
               <option value="ADMIN">ADMIN</option>
               <option value="TEACHER">TEACHER</option>
               <option value="STUDENT">STUDENT</option>
@@ -328,11 +338,11 @@ export default function AdminUsersPage() {
           <table className="min-w-full border-separate border-spacing-y-2">
             <thead>
               <tr className="text-left text-sm text-slate-500 dark:text-slate-400">
-                <th className="px-3 py-2 font-medium">Name</th>
+                <th className="px-3 py-2 font-medium">Nama</th>
                 <th className="px-3 py-2 font-medium">Email</th>
-                <th className="px-3 py-2 font-medium">Role</th>
+                <th className="px-3 py-2 font-medium">Peran</th>
                 <th className="px-3 py-2 font-medium">NIM</th>
-                <th className="px-3 py-2 font-medium">Major</th>
+                <th className="px-3 py-2 font-medium">Jurusan</th>
                 <th className="px-3 py-2 font-medium text-right">Aksi</th>
               </tr>
             </thead>
@@ -356,7 +366,7 @@ export default function AdminUsersPage() {
                           startTransition(async () => {
                             try {
                               await deleteUser(item.id);
-                              await loadUsers();
+                              await loadData();
                             } catch (err) {
                               setError(err instanceof Error ? err.message : "Gagal menghapus user.");
                             }
@@ -388,7 +398,7 @@ export default function AdminUsersPage() {
         )}
 
         <div className="mt-4 flex items-center justify-between">
-          <p className="text-xs text-slate-500 dark:text-slate-400">Page {safeCurrentPage} of {totalPages}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Halaman {safeCurrentPage} dari {totalPages}</p>
           <div className="flex items-center gap-2">
             <button type="button" disabled={safeCurrentPage === 1 || isPending} onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))} className="app-btn-ghost px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"><ChevronLeft className="h-4 w-4" /></button>
             <button type="button" disabled={safeCurrentPage === totalPages || isPending} onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))} className="app-btn-ghost px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"><ChevronRight className="h-4 w-4" /></button>
@@ -400,13 +410,13 @@ export default function AdminUsersPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
           <div className="app-card w-full max-w-xl p-6">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{editingId ? "Edit User" : "Add User"}</h2>
-              <button type="button" onClick={closeModal} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700" aria-label="Close modal"><X className="h-4 w-4" /></button>
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{editingId ? "Ubah Pengguna" : "Tambah Pengguna"}</h2>
+              <button type="button" onClick={closeModal} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700" aria-label="Tutup modal"><X className="h-4 w-4" /></button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Role</label>
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Peran</label>
                 <select value={form.role} onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value as UserRole }))} className="app-input" required>
                   <option value="ADMIN">ADMIN</option>
                   <option value="TEACHER">TEACHER</option>
@@ -428,7 +438,7 @@ export default function AdminUsersPage() {
 
               {!editingId && form.role !== "STUDENT" && (
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Password</label>
+                  <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Kata Sandi</label>
                   <input type="password" minLength={8} value={form.password} onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))} className="app-input" required />
                 </div>
               )}
@@ -440,8 +450,17 @@ export default function AdminUsersPage() {
                     <input type="text" value={form.nim} onChange={(e) => setForm((prev) => ({ ...prev, nim: e.target.value }))} className="app-input" required />
                   </div>
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Jurusan (Optional)</label>
-                    <input type="text" value={form.major} onChange={(e) => setForm((prev) => ({ ...prev, major: e.target.value }))} className="app-input" />
+                    <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Jurusan (Opsional)</label>
+                    <select value={form.majorId} onChange={(e) => setForm((prev) => ({ ...prev, majorId: e.target.value }))} className="app-input">
+                      <option value="">Pilih Jurusan</option>
+                      {majors
+                        .filter((major) => major.isActive)
+                        .map((major) => (
+                          <option key={major.id} value={major.id}>
+                            {major.code} - {major.name}
+                          </option>
+                        ))}
+                    </select>
                   </div>
                 </>
               )}
@@ -449,8 +468,8 @@ export default function AdminUsersPage() {
               {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">{error}</p>}
 
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeModal} className="app-btn-ghost" disabled={isPending}>Cancel</button>
-                <button type="submit" className="app-btn-primary" disabled={isPending}>{isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{editingId ? "Update" : "Save"}</button>
+                <button type="button" onClick={closeModal} className="app-btn-ghost" disabled={isPending}>Batal</button>
+                <button type="submit" className="app-btn-primary" disabled={isPending}>{isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{editingId ? "Perbarui" : "Simpan"}</button>
               </div>
             </form>
           </div>
@@ -461,8 +480,8 @@ export default function AdminUsersPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
           <div className="app-card w-full max-w-2xl p-6">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Bulk Insert Students</h2>
-              <button type="button" onClick={closeBulkModal} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700" aria-label="Close modal"><X className="h-4 w-4" /></button>
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Impor Massal Mahasiswa/Siswa</h2>
+              <button type="button" onClick={closeBulkModal} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700" aria-label="Tutup modal"><X className="h-4 w-4" /></button>
             </div>
 
             <form onSubmit={handleBulkSubmit} className="space-y-4">
@@ -477,8 +496,8 @@ export default function AdminUsersPage() {
               {bulkError && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">{bulkError}</p>}
 
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={closeBulkModal} className="app-btn-ghost" disabled={isPending}>Cancel</button>
-                <button type="submit" className="app-btn-primary" disabled={isPending}>{isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Insert Bulk</button>
+                <button type="button" onClick={closeBulkModal} className="app-btn-ghost" disabled={isPending}>Batal</button>
+                <button type="submit" className="app-btn-primary" disabled={isPending}>{isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Impor Massal</button>
               </div>
             </form>
           </div>

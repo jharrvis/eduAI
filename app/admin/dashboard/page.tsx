@@ -61,7 +61,7 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Dashboard Overview</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Ringkasan Dasbor</h1>
         <p className="mt-2 text-slate-500 dark:text-slate-400">Ringkasan statistik LMS terbaru.</p>
       </header>
 
@@ -74,30 +74,30 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div className="app-card flex items-center gap-4 p-5">
           <div className="rounded-xl bg-blue-100 p-3 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"><Calendar className="h-5 w-5" /></div>
-          <div><p className="text-sm text-slate-500 dark:text-slate-400">Total Classes</p><p className="text-2xl font-bold">{stats.classes}</p></div>
+          <div><p className="text-sm text-slate-500 dark:text-slate-400">Total Kelas</p><p className="text-2xl font-bold">{stats.classes}</p></div>
         </div>
         <div className="app-card flex items-center gap-4 p-5">
           <div className="rounded-xl bg-indigo-100 p-3 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"><BookOpen className="h-5 w-5" /></div>
-          <div><p className="text-sm text-slate-500 dark:text-slate-400">Total Materials</p><p className="text-2xl font-bold">{stats.materials}</p></div>
+          <div><p className="text-sm text-slate-500 dark:text-slate-400">Total Materi</p><p className="text-2xl font-bold">{stats.materials}</p></div>
         </div>
         <div className="app-card flex items-center gap-4 p-5">
           <div className="rounded-xl bg-emerald-100 p-3 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"><Users className="h-5 w-5" /></div>
-          <div><p className="text-sm text-slate-500 dark:text-slate-400">Total Students</p><p className="text-2xl font-bold">{stats.students}</p></div>
+          <div><p className="text-sm text-slate-500 dark:text-slate-400">Total Mahasiswa/Siswa</p><p className="text-2xl font-bold">{stats.students}</p></div>
         </div>
         <div className="app-card flex items-center gap-4 p-5">
           <div className="rounded-xl bg-amber-100 p-3 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"><CheckCircle className="h-5 w-5" /></div>
-          <div><p className="text-sm text-slate-500 dark:text-slate-400">Assignments</p><p className="text-2xl font-bold">{stats.assignments}</p></div>
+          <div><p className="text-sm text-slate-500 dark:text-slate-400">Tugas</p><p className="text-2xl font-bold">{stats.assignments}</p></div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="app-card p-6">
-          <h2 className="mb-4 text-lg font-semibold">Recent Classes</h2>
+          <h2 className="mb-4 text-lg font-semibold">Kelas Terbaru</h2>
           <div className="space-y-3">
             {recentClasses.map((item) => (
               <div key={item.id} className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900">
                 <p className="font-medium">{item.name}</p>
-                <p className="text-sm text-slate-500 dark:text-slate-400">{item.academicYear} • {item.students} students</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{item.academicYear} • {item.students} peserta</p>
               </div>
             ))}
             {recentClasses.length === 0 && (
@@ -109,7 +109,7 @@ export default function AdminDashboard() {
         </div>
 
         <div className="app-card p-6">
-          <h2 className="mb-4 text-lg font-semibold">Recent Materials</h2>
+          <h2 className="mb-4 text-lg font-semibold">Materi Terbaru</h2>
           <div className="space-y-3">
             {recentMaterials.map((item) => (
               <div key={item.id} className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900">
