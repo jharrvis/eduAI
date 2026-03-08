@@ -124,9 +124,9 @@ export default function StudentAssignmentsPage() {
                 ) : (
                   <div className="space-y-2 rounded-lg bg-emerald-50 p-3 text-sm dark:bg-emerald-900/20">
                     <p className="inline-flex items-center gap-2 font-medium text-emerald-700 dark:text-emerald-300"><CheckCircle className="h-4 w-4" />Status: {item.mySubmission?.status}</p>
-                    {item.mySubmission?.finalGrade !== null && <p>Nilai Akhir: <span className="font-semibold">{item.mySubmission.finalGrade}</span></p>}
-                    {item.mySubmission?.aiScore !== null && <p>Skor AI: <span className="font-semibold">{item.mySubmission.aiScore}</span></p>}
-                    {item.mySubmission?.aiFeedback && <p className="whitespace-pre-wrap">Umpan Balik: {item.mySubmission.aiFeedback}</p>}
+                    {item.mySubmission?.finalGrade !== null && <p>Nilai Akhir: <span className="font-semibold">{item.mySubmission?.finalGrade}</span></p>}
+                    {item.mySubmission?.aiScore !== null && <p>Skor AI: <span className="font-semibold">{item.mySubmission?.aiScore}</span></p>}
+                    {item.mySubmission?.aiFeedback && <p className="whitespace-pre-wrap">Umpan Balik: {item.mySubmission?.aiFeedback}</p>}
                   </div>
                 )}
               </div>
