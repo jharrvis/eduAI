@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/app/actions/_auth";
 import { user } from "@/lib/auth-schema";
 import { db } from "@/lib/db";
-import { classes, enrollments } from "@/lib/schema";
+import { classes, enrollments, majors } from "@/lib/schema";
 
 type ClassRole = "TEACHER" | "STUDENT";
 type AppRole = "ADMIN" | "TEACHER" | "STUDENT";
@@ -39,7 +39,12 @@ async function listClassesByRole(userId: string, role: AppRole): Promise<ClassIt
   return db
     .select()
     .from(classes)
-    .where(inArray(classes.id, enrolled.map((item) => item.classId)));
+    .where(
+      and(
+        inArray(classes.id, enrolled.map((item) => item.classId)),
+        eq(classes.isActive, true),
+      ),
+    );
 }
 
 export async function getClasses() {
@@ -87,17 +92,24 @@ export async function createClass(data: {
   name: string;
   description?: string;
   academicYear: string;
+  majorId: string;
   isActive?: boolean;
   startDate?: string;
   endDate?: string;
 }) {
   await requireRole(["ADMIN"]);
 
+  const majorId = data.majorId?.trim();
+  if (!majorId) throw new Error("Jurusan wajib dipilih.");
+  const majorRows = await db.select({ id: majors.id }).from(majors).where(eq(majors.id, majorId)).limit(1);
+  if (!majorRows[0]) throw new Error("Jurusan tidak ditemukan.");
+
   const result = await db
     .insert(classes)
     .values({
       name: data.name,
       description: data.description,
+      majorId,
       academicYear: data.academicYear,
       isActive: data.isActive ?? true,
       startDate: data.startDate ? new Date(data.startDate) : null,
@@ -115,6 +127,7 @@ export async function updateClass(
     name: string;
     description: string;
     academicYear: string;
+    majorId: string | null;
     isActive: boolean;
     startDate: string | null;
     endDate: string | null;
@@ -126,6 +139,16 @@ export async function updateClass(
   if (data.name !== undefined) payload.name = data.name;
   if (data.description !== undefined) payload.description = data.description;
   if (data.academicYear !== undefined) payload.academicYear = data.academicYear;
+  if (data.majorId !== undefined) {
+    const majorId = data.majorId?.trim();
+    if (!majorId) {
+      payload.majorId = null;
+    } else {
+      const majorRows = await db.select({ id: majors.id }).from(majors).where(eq(majors.id, majorId)).limit(1);
+      if (!majorRows[0]) throw new Error("Jurusan tidak ditemukan.");
+      payload.majorId = majorId;
+    }
+  }
   if (data.isActive !== undefined) payload.isActive = data.isActive;
   if (data.startDate !== undefined) payload.startDate = data.startDate ? new Date(data.startDate) : null;
   if (data.endDate !== undefined) payload.endDate = data.endDate ? new Date(data.endDate) : null;

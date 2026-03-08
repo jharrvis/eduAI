@@ -57,6 +57,13 @@
       "when": 1772859185611,
       "tag": "0007_oval_red_skull",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1772977630075,
+      "tag": "0008_daily_energizer",
+      "breakpoints": true
     }
   ]
 }

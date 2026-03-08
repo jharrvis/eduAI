@@ -4,9 +4,9 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import { useParams } from "next/navigation";
 import { createAssignment, deleteAssignment, getAssignments } from "@/app/actions/assignments";
 import { getMeetings } from "@/app/actions/class-meetings";
-import { createMaterial, deleteMaterial, getMaterials } from "@/app/actions/materials";
+import { createMaterial, deleteMaterial, getMaterials, updateMaterial } from "@/app/actions/materials";
 import FileUpload from "@/app/components/file-upload";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 
 type Meeting = {
   id: string;
@@ -17,7 +17,13 @@ type Meeting = {
   scheduledDate: Date;
 };
 
-type MaterialItem = { id: string; meetingId: string | null; title: string; fileUrl: string | null };
+type MaterialItem = {
+  id: string;
+  meetingId: string | null;
+  title: string;
+  content: string | null;
+  fileUrl: string | null;
+};
 type AssignmentItem = { id: string; meetingId: string | null; title: string; dueDate: Date };
 
 export default function TeacherMeetingDetailPage() {
@@ -34,6 +40,10 @@ export default function TeacherMeetingDetailPage() {
   const [assignmentTitle, setAssignmentTitle] = useState("");
   const [assignmentInstructions, setAssignmentInstructions] = useState("");
   const [assignmentDueDate, setAssignmentDueDate] = useState("");
+  const [editingMaterial, setEditingMaterial] = useState<MaterialItem | null>(null);
+  const [editMaterialTitle, setEditMaterialTitle] = useState("");
+  const [editMaterialContent, setEditMaterialContent] = useState("");
+  const [editMaterialFileUrl, setEditMaterialFileUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -125,25 +135,44 @@ export default function TeacherMeetingDetailPage() {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="font-medium">{m.title}</p>
-                    {m.fileUrl && <p className="text-blue-600 dark:text-blue-400">{m.fileUrl}</p>}
+                    {m.content && <p className="mt-1 whitespace-pre-wrap text-slate-600 dark:text-slate-300">{m.content}</p>}
+                    {m.fileUrl && (
+                      <a href={m.fileUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-blue-600 underline dark:text-blue-400">
+                        Buka Lampiran
+                      </a>
+                    )}
                   </div>
-                  <button
-                    type="button"
-                    className="rounded-lg p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                    onClick={() => {
-                      if (!window.confirm(`Hapus materi "${m.title}"?`)) return;
-                      startTransition(async () => {
-                        try {
-                          await deleteMaterial(m.id);
-                          await loadData();
-                        } catch (err) {
-                          setError(err instanceof Error ? err.message : "Gagal menghapus materi.");
-                        }
-                      });
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      className="rounded-lg p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                      onClick={() => {
+                        setEditingMaterial(m);
+                        setEditMaterialTitle(m.title);
+                        setEditMaterialContent(m.content || "");
+                        setEditMaterialFileUrl(m.fileUrl || "");
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-lg p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                      onClick={() => {
+                        if (!window.confirm(`Hapus materi "${m.title}"?`)) return;
+                        startTransition(async () => {
+                          try {
+                            await deleteMaterial(m.id);
+                            await loadData();
+                          } catch (err) {
+                            setError(err instanceof Error ? err.message : "Gagal menghapus materi.");
+                          }
+                        });
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -217,6 +246,50 @@ export default function TeacherMeetingDetailPage() {
           </div>
         </div>
       </div>
+
+      {editingMaterial && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="app-card w-full max-w-xl p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Ubah Materi</h2>
+              <button type="button" onClick={() => setEditingMaterial(null)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                startTransition(async () => {
+                  try {
+                    await updateMaterial(editingMaterial.id, {
+                      meetingId,
+                      title: editMaterialTitle,
+                      content: editMaterialContent,
+                      fileUrl: editMaterialFileUrl,
+                    });
+                    setEditingMaterial(null);
+                    await loadData();
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : "Gagal memperbarui materi.");
+                  }
+                });
+              }}
+            >
+              <input className="app-input" value={editMaterialTitle} onChange={(e) => setEditMaterialTitle(e.target.value)} placeholder="Judul materi" required />
+              <textarea className="app-input" rows={4} value={editMaterialContent} onChange={(e) => setEditMaterialContent(e.target.value)} placeholder="Konten materi" />
+              <FileUpload label="Lampiran Materi (Opsional)" scope="materials" value={editMaterialFileUrl} onChange={setEditMaterialFileUrl} disabled={isPending} />
+              <div className="flex justify-end gap-2">
+                <button type="button" className="app-btn-ghost" onClick={() => setEditingMaterial(null)}>Batal</button>
+                <button type="submit" className="app-btn-primary" disabled={isPending}>
+                  {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  Simpan Perubahan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

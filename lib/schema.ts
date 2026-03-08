@@ -162,7 +162,7 @@ export const userAcademicRelations = relations(user, ({ one, many }) => ({
   }),
 }));
 
-export const classesRelations = relations(classes, ({ many }) => ({
+export const classesRelations = relations(classes, ({ one, many }) => ({
   major: one(majors, {
     fields: [classes.majorId],
     references: [majors.id],

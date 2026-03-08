@@ -36,6 +36,7 @@ export default function AdminMaterialsPage() {
   const [rows, setRows] = useState<MaterialItem[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [form, setForm] = useState<MaterialForm>({
@@ -73,6 +74,8 @@ export default function AdminMaterialsPage() {
   const openCreate = () => {
     setEditingId(null);
     setError(null);
+    const firstClassId = classes[0]?.id || "";
+    setSelectedClassIds(firstClassId ? [firstClassId] : []);
     setForm({ classId: classes[0]?.id || "", title: "", content: "", fileUrl: "", scheduledAt: "" });
     setIsModalOpen(true);
   };
@@ -80,6 +83,7 @@ export default function AdminMaterialsPage() {
   const openEdit = (item: MaterialItem) => {
     setEditingId(item.id);
     setError(null);
+    setSelectedClassIds([item.classId]);
     setForm({
       classId: item.classId,
       title: item.title,
@@ -92,7 +96,8 @@ export default function AdminMaterialsPage() {
 
   const saveMaterial = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.classId || !form.title.trim() || !form.scheduledAt) {
+    const targetClassIds = editingId ? [form.classId] : selectedClassIds;
+    if (targetClassIds.length === 0 || !form.title.trim() || !form.scheduledAt) {
       setError("Kelas, judul, dan jadwal wajib diisi.");
       return;
     }
@@ -108,7 +113,8 @@ export default function AdminMaterialsPage() {
           });
         } else {
           await createMaterial({
-            classId: form.classId,
+            classId: targetClassIds[0],
+            classIds: targetClassIds,
             title: form.title,
             content: form.content,
             fileUrl: form.fileUrl,
@@ -193,10 +199,31 @@ export default function AdminMaterialsPage() {
             <form onSubmit={saveMaterial} className="space-y-4">
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Kelas</label>
-                <select className="app-input" value={form.classId} onChange={(e) => setForm((prev) => ({ ...prev, classId: e.target.value }))} required>
-                  <option value="" disabled>Pilih kelas</option>
-                  {classes.map((item) => (<option key={item.id} value={item.id}>{item.name}</option>))}
-                </select>
+                {editingId ? (
+                  <select className="app-input" value={form.classId} onChange={(e) => setForm((prev) => ({ ...prev, classId: e.target.value }))} required>
+                    <option value="" disabled>Pilih kelas</option>
+                    {classes.map((item) => (<option key={item.id} value={item.id}>{item.name}</option>))}
+                  </select>
+                ) : (
+                  <div className="max-h-40 space-y-2 overflow-y-auto rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                    {classes.map((item) => (
+                      <label key={item.id} className="flex cursor-pointer items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                        <input
+                          type="checkbox"
+                          checked={selectedClassIds.includes(item.id)}
+                          onChange={(e) => {
+                            const next = e.target.checked
+                              ? [...selectedClassIds, item.id]
+                              : selectedClassIds.filter((id) => id !== item.id);
+                            setSelectedClassIds(next);
+                            setForm((prev) => ({ ...prev, classId: next[0] || "" }));
+                          }}
+                        />
+                        <span>{item.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Judul</label>

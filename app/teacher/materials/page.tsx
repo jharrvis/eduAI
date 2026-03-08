@@ -43,6 +43,7 @@ export default function TeacherMaterialsPage() {
   const [rows, setRows] = useState<MaterialItem[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [form, setForm] = useState<MaterialForm>({
@@ -78,6 +79,7 @@ export default function TeacherMaterialsPage() {
     setEditingId(null);
     setError(null);
     const firstClassId = classes[0]?.id || "";
+    setSelectedClassIds(firstClassId ? [firstClassId] : []);
     setForm({ classId: firstClassId, meetingId: "", title: "", content: "", fileUrl: "", scheduledAt: "" });
     if (firstClassId) {
       startTransition(async () => {
@@ -91,6 +93,7 @@ export default function TeacherMaterialsPage() {
   const openEdit = (item: MaterialItem) => {
     setEditingId(item.id);
     setError(null);
+    setSelectedClassIds([item.classId]);
     setForm({
       classId: item.classId,
       meetingId: item.meetingId || "",
@@ -99,12 +102,23 @@ export default function TeacherMaterialsPage() {
       fileUrl: item.fileUrl || "",
       scheduledAt: toLocalInputValue(item.scheduledAt),
     });
+    startTransition(async () => {
+      const meetingRows = await getMeetings(item.classId);
+      setMeetings(
+        (meetingRows as MeetingItem[]).map((m) => ({
+          id: m.id,
+          title: m.title,
+          meetingNumber: m.meetingNumber,
+        })),
+      );
+    });
     setIsModalOpen(true);
   };
 
   const saveMaterial = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.classId || !form.title.trim() || !form.scheduledAt) {
+    const targetClassIds = editingId ? [form.classId] : selectedClassIds;
+    if (targetClassIds.length === 0 || !form.title.trim() || !form.scheduledAt) {
       setError("Kelas, judul, dan jadwal wajib diisi.");
       return;
     }
@@ -121,8 +135,9 @@ export default function TeacherMaterialsPage() {
           });
         } else {
           await createMaterial({
-            classId: form.classId,
-            meetingId: form.meetingId || undefined,
+            classId: targetClassIds[0],
+            classIds: targetClassIds,
+            meetingId: targetClassIds.length === 1 ? form.meetingId || undefined : undefined,
             title: form.title,
             content: form.content,
             fileUrl: form.fileUrl,
@@ -200,33 +215,74 @@ export default function TeacherMaterialsPage() {
             <form onSubmit={saveMaterial} className="space-y-4">
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Kelas</label>
-                <select
-                  className="app-input"
-                  value={form.classId}
-                  onChange={(e) => {
-                    const nextClassId = e.target.value;
-                    setForm((prev) => ({ ...prev, classId: nextClassId, meetingId: "" }));
-                    startTransition(async () => {
-                      const meetingRows = await getMeetings(nextClassId);
-                      setMeetings((meetingRows as MeetingItem[]).map((m) => ({ id: m.id, title: m.title, meetingNumber: m.meetingNumber })));
-                    });
-                  }}
-                  required
-                >
-                  <option value="" disabled>Pilih kelas</option>
-                  {classes.map((item) => (<option key={item.id} value={item.id}>{item.name}</option>))}
-                </select>
+                {editingId ? (
+                  <select
+                    className="app-input"
+                    value={form.classId}
+                    onChange={(e) => {
+                      const nextClassId = e.target.value;
+                      setForm((prev) => ({ ...prev, classId: nextClassId, meetingId: "" }));
+                      setSelectedClassIds([nextClassId]);
+                      startTransition(async () => {
+                        const meetingRows = await getMeetings(nextClassId);
+                        setMeetings((meetingRows as MeetingItem[]).map((m) => ({ id: m.id, title: m.title, meetingNumber: m.meetingNumber })));
+                      });
+                    }}
+                    required
+                  >
+                    <option value="" disabled>Pilih kelas</option>
+                    {classes.map((item) => (<option key={item.id} value={item.id}>{item.name}</option>))}
+                  </select>
+                ) : (
+                  <div className="max-h-40 space-y-2 overflow-y-auto rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                    {classes.map((item) => {
+                      const checked = selectedClassIds.includes(item.id);
+                      return (
+                        <label key={item.id} className="flex cursor-pointer items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              const next = e.target.checked
+                                ? [...selectedClassIds, item.id]
+                                : selectedClassIds.filter((id) => id !== item.id);
+                              setSelectedClassIds(next);
+                              if (next.length === 1) {
+                                const classId = next[0];
+                                setForm((prev) => ({ ...prev, classId, meetingId: "" }));
+                                startTransition(async () => {
+                                  const meetingRows = await getMeetings(classId);
+                                  setMeetings((meetingRows as MeetingItem[]).map((m) => ({ id: m.id, title: m.title, meetingNumber: m.meetingNumber })));
+                                });
+                              } else {
+                                setForm((prev) => ({ ...prev, classId: next[0] || "", meetingId: "" }));
+                                setMeetings([]);
+                              }
+                            }}
+                          />
+                          <span>{item.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Pertemuan (Opsional)</label>
                 <select
                   className="app-input"
                   value={form.meetingId}
+                  disabled={!editingId && selectedClassIds.length !== 1}
                   onChange={(e) => setForm((prev) => ({ ...prev, meetingId: e.target.value }))}
                 >
                   <option value="">Tanpa pertemuan</option>
                   {meetings.map((item) => (<option key={item.id} value={item.id}>P{item.meetingNumber} - {item.title}</option>))}
                 </select>
+                {!editingId && selectedClassIds.length !== 1 && (
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Pilihan pertemuan aktif jika kelas yang dipilih tepat satu.
+                  </p>
+                )}
               </div>
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Judul</label>

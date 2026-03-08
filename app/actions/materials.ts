@@ -67,6 +67,7 @@ export async function getMaterials(classId?: string) {
 
 export async function createMaterial(data: {
   classId: string;
+  classIds?: string[];
   meetingId?: string;
   title: string;
   content?: string;
@@ -74,22 +75,34 @@ export async function createMaterial(data: {
   scheduledAt: string;
 }) {
   const session = await requireRole(["ADMIN", "TEACHER"]);
+  const targetClassIds = Array.from(
+    new Set(
+      (data.classIds && data.classIds.length > 0 ? data.classIds : [data.classId])
+        .map((id) => id?.trim())
+        .filter(Boolean),
+    ),
+  ) as string[];
+  if (targetClassIds.length === 0) {
+    throw new Error("Kelas wajib dipilih.");
+  }
 
   if (session.user.role === "TEACHER") {
-    const teaching = await db
-      .select({ id: enrollments.id })
-      .from(enrollments)
-      .where(
-        and(
-          eq(enrollments.userId, session.user.id),
-          eq(enrollments.classId, data.classId),
-          eq(enrollments.roleInClass, "TEACHER"),
-        ),
-      )
-      .limit(1);
+    for (const classId of targetClassIds) {
+      const teaching = await db
+        .select({ id: enrollments.id })
+        .from(enrollments)
+        .where(
+          and(
+            eq(enrollments.userId, session.user.id),
+            eq(enrollments.classId, classId),
+            eq(enrollments.roleInClass, "TEACHER"),
+          ),
+        )
+        .limit(1);
 
-    if (!teaching[0]) {
-      throw new Error("FORBIDDEN");
+      if (!teaching[0]) {
+        throw new Error("FORBIDDEN");
+      }
     }
   }
 
@@ -97,6 +110,9 @@ export async function createMaterial(data: {
   let meetingId: string | null = null;
 
   if (data.meetingId) {
+    if (targetClassIds.length > 1) {
+      throw new Error("Pertemuan hanya bisa dipilih jika kelas yang dipilih satu.");
+    }
     const meetingRows = await db
       .select({
         id: classMeetings.id,
@@ -108,7 +124,7 @@ export async function createMaterial(data: {
       .limit(1);
 
     if (!meetingRows[0]) throw new Error("Pertemuan tidak ditemukan.");
-    if (meetingRows[0].classId !== data.classId) {
+    if (meetingRows[0].classId !== targetClassIds[0]) {
       throw new Error("Pertemuan tidak sesuai dengan kelas.");
     }
 
@@ -116,14 +132,16 @@ export async function createMaterial(data: {
     meetingId = meetingRows[0].id;
   }
 
-  await db.insert(materials).values({
-    classId: data.classId,
-    meetingId,
-    title: data.title.trim(),
-    content: data.content?.trim() || null,
-    fileUrl: data.fileUrl?.trim() || null,
-    scheduledAt,
-  });
+  await db.insert(materials).values(
+    targetClassIds.map((classId) => ({
+      classId,
+      meetingId: targetClassIds.length === 1 ? meetingId : null,
+      title: data.title.trim(),
+      content: data.content?.trim() || null,
+      fileUrl: data.fileUrl?.trim() || null,
+      scheduledAt,
+    })),
+  );
 
   revalidateMaterialPages();
 }
@@ -131,6 +149,7 @@ export async function createMaterial(data: {
 export async function updateMaterial(
   id: string,
   data: Partial<{
+    classId: string;
     meetingId: string | null;
     title: string;
     content: string;
@@ -165,6 +184,30 @@ export async function updateMaterial(
   }
 
   const payload: Partial<typeof materials.$inferInsert> = {};
+  let effectiveClassId = currentRows[0].classId;
+  if (data.classId !== undefined) {
+    const nextClassId = data.classId.trim();
+    if (!nextClassId) throw new Error("Kelas wajib dipilih.");
+
+    if (session.user.role === "TEACHER") {
+      const canMove = await db
+        .select({ id: enrollments.id })
+        .from(enrollments)
+        .where(
+          and(
+            eq(enrollments.userId, session.user.id),
+            eq(enrollments.classId, nextClassId),
+            eq(enrollments.roleInClass, "TEACHER"),
+          ),
+        )
+        .limit(1);
+      if (!canMove[0]) throw new Error("FORBIDDEN");
+    }
+
+    payload.classId = nextClassId;
+    effectiveClassId = nextClassId;
+  }
+
   if (data.meetingId !== undefined) {
     if (!data.meetingId) {
       payload.meetingId = null;
@@ -179,7 +222,7 @@ export async function updateMaterial(
         .where(eq(classMeetings.id, data.meetingId))
         .limit(1);
       if (!meetingRows[0]) throw new Error("Pertemuan tidak ditemukan.");
-      if (meetingRows[0].classId !== currentRows[0].classId) {
+      if (meetingRows[0].classId !== effectiveClassId) {
         throw new Error("Pertemuan tidak sesuai dengan kelas materi.");
       }
       payload.meetingId = meetingRows[0].id;

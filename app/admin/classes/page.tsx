@@ -15,6 +15,7 @@ import {
   getMeetings,
   updateMeeting,
 } from "@/app/actions/class-meetings";
+import { getMajors } from "@/app/actions/majors";
 import { getClassRooms } from "@/app/actions/classrooms";
 import { enrollUsers, removeEnrollment } from "@/app/actions/enrollments";
 import { getStudents, getUsers, type UserWithProfile } from "@/app/actions/users";
@@ -24,6 +25,7 @@ type ClassForm = {
   name: string;
   academicYear: string;
   description: string;
+  majorId: string;
   isActive: boolean;
   startDate: string;
   endDate: string;
@@ -58,6 +60,13 @@ type ClassRoomItem = {
   isActive: boolean;
 };
 
+type MajorItem = {
+  id: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+};
+
 function toLocalInputValue(date: Date) {
   const d = new Date(date);
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
@@ -69,6 +78,7 @@ export default function AdminClasses() {
   const [teachers, setTeachers] = useState<UserWithProfile[]>([]);
   const [students, setStudents] = useState<UserWithProfile[]>([]);
   const [classRooms, setClassRooms] = useState<ClassRoomItem[]>([]);
+  const [majors, setMajors] = useState<MajorItem[]>([]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
@@ -89,6 +99,7 @@ export default function AdminClasses() {
     name: "",
     academicYear: "",
     description: "",
+    majorId: "",
     isActive: true,
     startDate: "",
     endDate: "",
@@ -114,6 +125,10 @@ export default function AdminClasses() {
     () => new Map(classRooms.map((room) => [room.id, `${room.code} - ${room.name}`])),
     [classRooms],
   );
+  const majorMap = useMemo(
+    () => new Map(majors.map((major) => [major.id, `${major.code} - ${major.name}`])),
+    [majors],
+  );
 
   const selectedClass = useMemo(
     () => rows.find((item) => item.id === selectedClassId) || null,
@@ -123,17 +138,19 @@ export default function AdminClasses() {
   const loadData = () => {
     startTransition(async () => {
       try {
-        const [classRows, teacherRows, studentRows, classRoomRows] = await Promise.all([
+        const [classRows, teacherRows, studentRows, classRoomRows, majorRows] = await Promise.all([
           getClassesWithMembers(),
           getUsers("TEACHER"),
           getStudents(),
           getClassRooms(),
+          getMajors(),
         ]);
 
         setRows(classRows);
         setTeachers(teacherRows);
         setStudents(studentRows);
         setClassRooms(classRoomRows as ClassRoomItem[]);
+        setMajors(majorRows as MajorItem[]);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Gagal memuat data kelas.");
       }
@@ -147,7 +164,7 @@ export default function AdminClasses() {
   const openCreateModal = () => {
     setEditingId(null);
     setError(null);
-    setForm({ name: "", academicYear: "", description: "", isActive: true, startDate: "", endDate: "" });
+    setForm({ name: "", academicYear: "", description: "", majorId: "", isActive: true, startDate: "", endDate: "" });
     setIsModalOpen(true);
   };
 
@@ -158,6 +175,7 @@ export default function AdminClasses() {
       name: item.name,
       academicYear: item.academicYear,
       description: item.description || "",
+      majorId: item.majorId || "",
       isActive: item.isActive ?? true,
       startDate: item.startDate ? new Date(item.startDate).toISOString().slice(0, 16) : "",
       endDate: item.endDate ? new Date(item.endDate).toISOString().slice(0, 16) : "",
@@ -213,6 +231,7 @@ export default function AdminClasses() {
             name: form.name.trim(),
             academicYear: form.academicYear.trim(),
             description: form.description.trim() || undefined,
+            majorId: form.majorId || null,
             isActive: form.isActive,
             startDate: form.startDate || null,
             endDate: form.endDate || null,
@@ -222,6 +241,7 @@ export default function AdminClasses() {
             name: form.name.trim(),
             academicYear: form.academicYear.trim(),
             description: form.description.trim() || undefined,
+            majorId: form.majorId,
             isActive: form.isActive,
             startDate: form.startDate || undefined,
             endDate: form.endDate || undefined,
@@ -407,6 +427,9 @@ export default function AdminClasses() {
                   <Calendar className="h-4 w-4" />
                   {item.academicYear}
                 </div>
+                <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Jurusan: {item.majorId ? (majorMap.get(item.majorId) || "-") : "-"}
+                </div>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                   <span className={`rounded-full px-2 py-1 font-medium ${item.isActive ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200"}`}>
                     {item.isActive ? "Aktif" : "Tidak Aktif"}
@@ -548,6 +571,27 @@ export default function AdminClasses() {
                   placeholder="Contoh: 2026/2027"
                   required
                 />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Jurusan
+                </label>
+                <select
+                  value={form.majorId}
+                  onChange={(e) => setForm((prev) => ({ ...prev, majorId: e.target.value }))}
+                  className="app-input"
+                  required
+                >
+                  <option value="">Pilih Jurusan</option>
+                  {majors
+                    .filter((major) => major.isActive || major.id === form.majorId)
+                    .map((major) => (
+                      <option key={major.id} value={major.id}>
+                        {major.code} - {major.name}
+                      </option>
+                    ))}
+                </select>
               </div>
 
               <div>
