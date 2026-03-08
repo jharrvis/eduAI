@@ -5,6 +5,7 @@ import { getClasses } from "@/app/actions/classes";
 import { getMeetings } from "@/app/actions/class-meetings";
 import { createMaterial, deleteMaterial, getMaterials, updateMaterial } from "@/app/actions/materials";
 import FileUpload from "@/app/components/file-upload";
+import RichTextEditor from "@/app/components/rich-text-editor";
 import { Copy, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 
 type ClassItem = { id: string; name: string };
@@ -321,7 +322,7 @@ export default function TeacherMaterialsPage() {
               </div>
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Konten</label>
-                <textarea rows={5} className="app-input" value={form.content} onChange={(e) => setForm((prev) => ({ ...prev, content: e.target.value }))} />
+                <RichTextEditor value={form.content} onChange={(content) => setForm((prev) => ({ ...prev, content }))} placeholder="Tulis konten materi di sini..." disabled={isPending} />
               </div>
               <FileUpload
                 label="Lampiran Materi (Opsional)"

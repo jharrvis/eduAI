@@ -1,13 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { getAssignmentsWithMySubmission, submitAssignment } from "@/app/actions/submissions";
+import { useCallback, useEffect, useState, useTransition } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
 import { getStudentClassById } from "@/app/actions/classes";
 import { getMeetings } from "@/app/actions/class-meetings";
-import { getMaterials } from "@/app/actions/materials";
-import FileUpload from "@/app/components/file-upload";
-import { Lock, Unlock } from "lucide-react";
-import { useParams } from "next/navigation";
+import { BookOpen, ChevronRight, Lock, Loader2 } from "lucide-react";
 
 type Meeting = {
   id: string;
@@ -17,54 +15,23 @@ type Meeting = {
   scheduledDate: Date;
 };
 
-type Material = {
-  id: string;
-  meetingId: string | null;
-  title: string;
-  content: string | null;
-  fileUrl: string | null;
-};
-
-type Assignment = {
-  id: string;
-  meetingId: string | null;
-  title: string;
-  dueDate: Date;
-  mySubmission: {
-    answerText: string | null;
-    aiFeedback: string | null;
-    aiScore: number | null;
-    finalGrade: number | null;
-    status: string;
-  } | null;
-};
-
 export default function StudentClassDetailPage() {
   const params = useParams<{ classId: string }>();
   const classId = params.classId;
   const [className, setClassName] = useState("");
   const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [materials, setMaterials] = useState<Material[]>([]);
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [answerMap, setAnswerMap] = useState<Record<string, string>>({});
-  const [fileMap, setFileMap] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const loadData = useCallback(() => {
     startTransition(async () => {
       try {
-        const classData = await getStudentClassById(classId);
-        const [meetingRows, materialRows, assignmentRows] = await Promise.all([
+        const [classData, meetingRows] = await Promise.all([
+          getStudentClassById(classId),
           getMeetings(classId),
-          getMaterials(classId),
-          getAssignmentsWithMySubmission(classId),
         ]);
-
         setClassName(classData.name);
         setMeetings(meetingRows as Meeting[]);
-        setMaterials(materialRows as Material[]);
-        setAssignments(assignmentRows as Assignment[]);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Gagal memuat detail kelas.");
       }
@@ -77,32 +44,27 @@ export default function StudentClassDetailPage() {
 
   const now = new Date();
 
-  const materialsByMeeting = useMemo(() => {
-    const map = new Map<string, Material[]>();
-    materials.forEach((m) => {
-      if (!m.meetingId) return;
-      if (!map.has(m.meetingId)) map.set(m.meetingId, []);
-      map.get(m.meetingId)?.push(m);
-    });
-    return map;
-  }, [materials]);
-
-  const assignmentsByMeeting = useMemo(() => {
-    const map = new Map<string, Assignment[]>();
-    assignments.forEach((a) => {
-      if (!a.meetingId) return;
-      if (!map.has(a.meetingId)) map.set(a.meetingId, []);
-      map.get(a.meetingId)?.push(a);
-    });
-    return map;
-  }, [assignments]);
+  if (isPending && !className) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
+      <div>
+        <Link href="/student/classes" className="text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+          ← Kelas Saya
+        </Link>
+      </div>
+
       <header>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-          Jadwal Kelas {className ? `• ${className}` : ""}
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+          {className || "Detail Kelas"}
         </h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Pilih pertemuan untuk melihat materi dan tugas.</p>
       </header>
 
       {error && (
@@ -111,137 +73,88 @@ export default function StudentClassDetailPage() {
         </div>
       )}
 
-      <div className="space-y-4">
+      <div className="space-y-2">
         {meetings.map((meeting) => {
           const unlocked = new Date(meeting.scheduledDate) <= now;
-          const meetingMaterials = materialsByMeeting.get(meeting.id) || [];
-          const meetingAssignments = assignmentsByMeeting.get(meeting.id) || [];
 
-          return (
-            <div key={meeting.id} className="app-card p-5">
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                    Pertemuan {meeting.meetingNumber}: {meeting.title}
-                  </h2>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                    {new Date(meeting.scheduledDate).toLocaleString()}
-                  </p>
-                  {meeting.description && <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{meeting.description}</p>}
+          if (!unlocked) {
+            return (
+              <div
+                key={meeting.id}
+                className="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4 opacity-60 dark:border-slate-700 dark:bg-slate-800/40"
+              >
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-200 text-sm font-bold text-slate-500 dark:bg-slate-700 dark:text-slate-400">
+                  P{meeting.meetingNumber}
                 </div>
-                <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${unlocked ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"}`}>
-                  {unlocked ? <Unlock className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
-                  {unlocked ? "Terbuka" : "Terkunci"}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold text-slate-500 dark:text-slate-400">{meeting.title}</p>
+                  <p className="text-sm text-slate-400 dark:text-slate-500">
+                    {new Date(meeting.scheduledDate).toLocaleDateString("id-ID", {
+                      weekday: "long",
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                    {" • "}
+                    {new Date(meeting.scheduledDate).toLocaleTimeString("id-ID", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </div>
+                <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                  <Lock className="h-3 w-3" />
+                  Terkunci
                 </span>
               </div>
+            );
+          }
 
-              {!unlocked ? (
+          return (
+            <Link
+              key={meeting.id}
+              href={`/student/classes/${classId}/meetings/${meeting.id}`}
+              className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 transition hover:border-blue-300 hover:bg-blue-50/40 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-blue-700 dark:hover:bg-blue-900/10"
+            >
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                P{meeting.meetingNumber}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-semibold text-slate-900 dark:text-slate-100">{meeting.title}</p>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                  Tersedia pada {new Date(meeting.scheduledDate).toLocaleString()}
+                  {new Date(meeting.scheduledDate).toLocaleDateString("id-ID", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                  {" • "}
+                  {new Date(meeting.scheduledDate).toLocaleTimeString("id-ID", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </p>
-              ) : (
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                  <div>
-                    <h3 className="mb-2 font-semibold">Materi</h3>
-                    <div className="space-y-2">
-                      {meetingMaterials.map((m) => (
-                        <div key={m.id} className="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700">
-                          <p className="font-medium">{m.title}</p>
-                          {m.content && <p className="mt-1 whitespace-pre-wrap text-slate-600 dark:text-slate-300">{m.content}</p>}
-                          {m.fileUrl && (
-                            <a href={m.fileUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-blue-600 underline dark:text-blue-400">
-                              Buka Lampiran
-                            </a>
-                          )}
-                        </div>
-                      ))}
-                      {meetingMaterials.length === 0 && <p className="text-sm text-slate-500 dark:text-slate-400">Belum ada materi.</p>}
-                    </div>
-                  </div>
-                  <div>
-                    <h3 className="mb-2 font-semibold">Tugas</h3>
-                    <div className="space-y-2">
-                      {meetingAssignments.map((a) => {
-                        const isRevision = a.mySubmission?.status === "REVISION";
-                        const canSubmit = !a.mySubmission || isRevision;
-                        const answerValue = answerMap[a.id] ?? a.mySubmission?.answerText ?? "";
-                        const isLate = new Date(a.dueDate) < new Date() && !a.mySubmission;
-
-                        return (
-                          <div key={a.id} className="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700">
-                            <p className="font-medium">{a.title}</p>
-                            <div className="mt-1 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                              <span>Tenggat: {new Date(a.dueDate).toLocaleString()}</span>
-                              {isLate && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-600">Terlambat</span>}
-                            </div>
-
-                            {canSubmit ? (
-                              <div className="mt-2 space-y-2">
-                                {isRevision && (
-                                  <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
-                                    Perlu revisi. Silakan kirim ulang.
-                                  </p>
-                                )}
-                                <textarea
-                                  rows={3}
-                                  className="app-input"
-                                  value={answerValue}
-                                  onChange={(e) => setAnswerMap((prev) => ({ ...prev, [a.id]: e.target.value }))}
-                                  placeholder="Jawaban Anda"
-                                />
-                                <FileUpload
-                                  label="Lampiran (Opsional)"
-                                  scope="submissions"
-                                  value={fileMap[a.id] || ""}
-                                  onChange={(fileUrl) => setFileMap((prev) => ({ ...prev, [a.id]: fileUrl }))}
-                                  disabled={isPending}
-                                />
-                                <button
-                                  type="button"
-                                  className="app-btn-primary"
-                                  disabled={isPending || !answerValue.trim()}
-                                  onClick={() => {
-                                    startTransition(async () => {
-                                      try {
-                                        await submitAssignment(a.id, {
-                                          answerText: answerValue,
-                                          fileUrl: fileMap[a.id] || undefined,
-                                        });
-                                        await loadData();
-                                      } catch (err) {
-                                        setError(err instanceof Error ? err.message : "Gagal mengumpulkan tugas.");
-                                      }
-                                    });
-                                  }}
-                                >
-                                  {isRevision ? "Kirim Revisi" : "Kumpulkan"}
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="mt-2 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
-                                <p>Status: {a.mySubmission?.status}</p>
-                                {a.mySubmission?.finalGrade !== null && <p>Nilai Akhir: <span className="font-semibold">{a.mySubmission?.finalGrade}</span></p>}
-                                {a.mySubmission?.aiFeedback && <p className="whitespace-pre-wrap">Umpan Balik: {a.mySubmission?.aiFeedback}</p>}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                      {meetingAssignments.length === 0 && <p className="text-sm text-slate-500 dark:text-slate-400">Belum ada tugas.</p>}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+                {meeting.description && (
+                  <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">{meeting.description}</p>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                  <BookOpen className="h-3 w-3" />
+                  Terbuka
+                </span>
+                <ChevronRight className="h-4 w-4 text-slate-400" />
+              </div>
+            </Link>
           );
         })}
-      </div>
 
-      {!isPending && meetings.length === 0 && !error && (
-        <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-500 dark:border-slate-700 dark:text-slate-400">
-          Belum ada jadwal pertemuan.
-        </div>
-      )}
+        {!isPending && meetings.length === 0 && !error && (
+          <div className="rounded-xl border border-dashed border-slate-300 p-10 text-center text-slate-500 dark:border-slate-700 dark:text-slate-400">
+            Belum ada jadwal pertemuan.
+          </div>
+        )}
+      </div>
     </div>
   );
 }

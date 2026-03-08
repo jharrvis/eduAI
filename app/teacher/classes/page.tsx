@@ -3,10 +3,16 @@
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { getClassesWithMembers, type ClassWithMembers } from "@/app/actions/classes";
-import { ArrowRight, BookOpen, Loader2, Users } from "lucide-react";
+import { ArrowRight, Loader2, Users, X } from "lucide-react";
+
+type StudentModalState = {
+  className: string;
+  students: Array<{ userId: string; name: string; email: string }>;
+} | null;
 
 export default function TeacherClassesPage() {
   const [rows, setRows] = useState<ClassWithMembers[]>([]);
+  const [studentModal, setStudentModal] = useState<StudentModalState>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -49,41 +55,25 @@ export default function TeacherClassesPage() {
               </span>
             </div>
 
-            <div className="space-y-3">
-              <div>
-                <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  <Users className="h-3.5 w-3.5" /> Dosen/Guru ({item.teachers.length})
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {item.teachers.map((t) => (
-                    <span key={t.userId} className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                      {t.name}
-                    </span>
-                  ))}
-                </div>
+            <div className="flex items-center gap-6 rounded-xl bg-slate-50 px-4 py-3 dark:bg-slate-800/50">
+              <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                <Users className="h-4 w-4 text-blue-500" />
+                <span className="font-medium">{item.teachers.length}</span>
+                <span className="text-slate-400">Dosen/Guru</span>
               </div>
-
-              <div>
-                <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  <BookOpen className="h-3.5 w-3.5" /> Mahasiswa/Siswa ({item.students.length})
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {item.students.length > 0 ? (
-                    item.students.slice(0, 5).map((s) => (
-                      <span key={s.userId} className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-                        {s.name}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-xs text-slate-400">Belum ada mahasiswa/siswa.</span>
-                  )}
-                  {item.students.length > 5 && (
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                      +{item.students.length - 5} lainnya
-                    </span>
-                  )}
-                </div>
-              </div>
+              <div className="h-4 w-px bg-slate-200 dark:bg-slate-700" />
+              <button
+                type="button"
+                onClick={() => setStudentModal({ className: item.name, students: item.students })}
+                className="flex items-center gap-2 text-sm text-slate-600 hover:text-blue-600 dark:text-slate-300 dark:hover:text-blue-400"
+              >
+                <Users className="h-4 w-4 text-emerald-500" />
+                <span className="font-medium">{item.students.length}</span>
+                <span className="text-slate-400">Mahasiswa/Siswa</span>
+                {item.students.length > 0 && (
+                  <span className="text-xs text-blue-500 underline underline-offset-2">Lihat</span>
+                )}
+              </button>
             </div>
 
             <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
@@ -111,6 +101,53 @@ export default function TeacherClassesPage() {
           </div>
         )}
       </div>
+
+      {studentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="app-card w-full max-w-md p-6">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  Daftar Mahasiswa/Siswa
+                </h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{studentModal.className}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStudentModal(null)}
+                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {studentModal.students.length === 0 ? (
+              <p className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                Belum ada mahasiswa/siswa di kelas ini.
+              </p>
+            ) : (
+              <div className="max-h-96 overflow-y-auto">
+                <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+                  Total: <span className="font-semibold">{studentModal.students.length}</span> orang
+                </p>
+                <ul className="space-y-2">
+                  {studentModal.students.map((s, idx) => (
+                    <li key={s.userId} className="flex items-center gap-3 rounded-lg p-2 hover:bg-slate-50 dark:hover:bg-slate-800">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                        {idx + 1}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{s.name}</p>
+                        <p className="truncate text-xs text-slate-500 dark:text-slate-400">{s.email}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
