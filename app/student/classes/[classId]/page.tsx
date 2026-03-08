@@ -220,8 +220,8 @@ export default function StudentClassDetailPage() {
                             ) : (
                               <div className="mt-2 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
                                 <p>Status: {a.mySubmission?.status}</p>
-                                {a.mySubmission?.finalGrade !== null && <p>Nilai Akhir: <span className="font-semibold">{a.mySubmission.finalGrade}</span></p>}
-                                {a.mySubmission?.aiFeedback && <p className="whitespace-pre-wrap">Umpan Balik: {a.mySubmission.aiFeedback}</p>}
+                                {a.mySubmission?.finalGrade !== null && <p>Nilai Akhir: <span className="font-semibold">{a.mySubmission?.finalGrade}</span></p>}
+                                {a.mySubmission?.aiFeedback && <p className="whitespace-pre-wrap">Umpan Balik: {a.mySubmission?.aiFeedback}</p>}
                               </div>
                             )}
                           </div>
