@@ -196,9 +196,9 @@ export default function StudentMaterialsPage() {
                         ) : (
                           <div className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
                             <p>Status: {assignment.mySubmission?.status}</p>
-                            {assignment.mySubmission?.finalGrade !== null && <p>Nilai Akhir: <span className="font-semibold">{assignment.mySubmission.finalGrade}</span></p>}
-                            {assignment.mySubmission?.aiScore !== null && <p>Skor AI: <span className="font-semibold">{assignment.mySubmission.aiScore}</span></p>}
-                            {assignment.mySubmission?.aiFeedback && <p className="whitespace-pre-wrap">Umpan Balik: {assignment.mySubmission.aiFeedback}</p>}
+                            {assignment.mySubmission?.finalGrade !== null && <p>Nilai Akhir: <span className="font-semibold">{assignment.mySubmission?.finalGrade}</span></p>}
+                            {assignment.mySubmission?.aiScore !== null && <p>Skor AI: <span className="font-semibold">{assignment.mySubmission?.aiScore}</span></p>}
+                            {assignment.mySubmission?.aiFeedback && <p className="whitespace-pre-wrap">Umpan Balik: {assignment.mySubmission?.aiFeedback}</p>}
                           </div>
                         )}
                       </div>
