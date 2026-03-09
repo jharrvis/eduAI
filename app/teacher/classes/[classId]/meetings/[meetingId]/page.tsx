@@ -8,6 +8,7 @@ import { createMaterial, deleteMaterial, getMaterials, updateMaterial } from "@/
 import FileUpload from "@/app/components/file-upload";
 import RichTextEditor from "@/app/components/rich-text-editor";
 import { Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { getAbsoluteFileUrl } from "@/lib/utils";
 
 type Meeting = {
   id: string;
@@ -163,7 +164,7 @@ export default function TeacherMeetingDetailPage() {
                           {m.fileUrl.toLowerCase().endsWith('.pdf') ? (
                             <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
                               <iframe
-                                src={`${m.fileUrl}#toolbar=0`}
+                                src={`${getAbsoluteFileUrl(m.fileUrl)}#toolbar=0`}
                                 className="h-[400px] w-full"
                                 title="PDF Viewer"
                               />
@@ -171,19 +172,19 @@ export default function TeacherMeetingDetailPage() {
                           ) : m.fileUrl.toLowerCase().endsWith('.docx') || m.fileUrl.toLowerCase().endsWith('.doc') ? (
                             <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
                               <iframe
-                                src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(m.fileUrl)}`}
+                                src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(getAbsoluteFileUrl(m.fileUrl))}`}
                                 className="h-[400px] w-full"
                                 title="Document Viewer"
                               />
                             </div>
                           ) : (
-                            <a href={m.fileUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-blue-600 underline dark:text-blue-400">
+                            <a href={getAbsoluteFileUrl(m.fileUrl)} target="_blank" rel="noreferrer" className="mt-1 inline-block text-blue-600 underline dark:text-blue-400">
                               Buka Lampiran
                             </a>
                           )}
                           <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                             <a
-                              href={m.fileUrl}
+                              href={getAbsoluteFileUrl(m.fileUrl)}
                               target="_blank"
                               rel="noreferrer"
                               className="text-blue-600 underline hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
@@ -331,15 +332,15 @@ export default function TeacherMeetingDetailPage() {
 
       {editingMaterial && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-          <div className="app-card w-full max-w-xl p-6">
-            <div className="mb-4 flex items-center justify-between">
+          <div className="app-card flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-700">
               <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Ubah Materi</h2>
               <button type="button" onClick={() => setEditingMaterial(null)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700">
                 <X className="h-4 w-4" />
               </button>
             </div>
             <form
-              className="space-y-3"
+              className="flex-1 space-y-3 overflow-y-auto p-6"
               onSubmit={(e) => {
                 e.preventDefault();
                 startTransition(async () => {
@@ -361,12 +362,14 @@ export default function TeacherMeetingDetailPage() {
               <input className="app-input" value={editMaterialTitle} onChange={(e) => setEditMaterialTitle(e.target.value)} placeholder="Judul materi" required />
               <RichTextEditor value={editMaterialContent} onChange={setEditMaterialContent} placeholder="Tulis konten materi di sini..." disabled={isPending} />
               <FileUpload label="Lampiran Materi (Opsional)" scope="materials" value={editMaterialFileUrl} onChange={setEditMaterialFileUrl} disabled={isPending} />
-              <div className="flex justify-end gap-2">
+              <div className="sticky bottom-0 -mx-6 border-t border-slate-200 bg-white px-6 pt-3 dark:border-slate-700 dark:bg-slate-900">
+                <div className="flex justify-end gap-2">
                 <button type="button" className="app-btn-ghost" onClick={() => setEditingMaterial(null)}>Batal</button>
                 <button type="submit" className="app-btn-primary" disabled={isPending}>
                   {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                   Simpan Perubahan
                 </button>
+                </div>
               </div>
             </form>
           </div>
@@ -375,15 +378,15 @@ export default function TeacherMeetingDetailPage() {
 
       {editingAssignment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-          <div className="app-card w-full max-w-xl p-6">
-            <div className="mb-4 flex items-center justify-between">
+          <div className="app-card flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-700">
               <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Ubah Tugas</h2>
               <button type="button" onClick={() => setEditingAssignment(null)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700">
                 <X className="h-4 w-4" />
               </button>
             </div>
             <form
-              className="space-y-3"
+              className="flex-1 space-y-3 overflow-y-auto p-6"
               onSubmit={(e) => {
                 e.preventDefault();
                 startTransition(async () => {
@@ -404,12 +407,14 @@ export default function TeacherMeetingDetailPage() {
               <input className="app-input" value={editAssignmentTitle} onChange={(e) => setEditAssignmentTitle(e.target.value)} placeholder="Judul tugas" required />
               <RichTextEditor value={editAssignmentInstructions} onChange={setEditAssignmentInstructions} placeholder="Instruksi tugas" disabled={isPending} />
               <input type="datetime-local" className="app-input" value={editAssignmentDueDate} onChange={(e) => setEditAssignmentDueDate(e.target.value)} required />
-              <div className="flex justify-end gap-2">
-                <button type="button" className="app-btn-ghost" onClick={() => setEditingAssignment(null)}>Batal</button>
-                <button type="submit" className="app-btn-primary" disabled={isPending}>
-                  {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                  Simpan Perubahan
-                </button>
+              <div className="sticky bottom-0 -mx-6 border-t border-slate-200 bg-white px-6 pt-3 dark:border-slate-700 dark:bg-slate-900">
+                <div className="flex justify-end gap-2">
+                  <button type="button" className="app-btn-ghost" onClick={() => setEditingAssignment(null)}>Batal</button>
+                  <button type="submit" className="app-btn-primary" disabled={isPending}>
+                    {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    Simpan Perubahan
+                  </button>
+                </div>
               </div>
             </form>
           </div>

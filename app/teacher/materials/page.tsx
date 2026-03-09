@@ -7,6 +7,7 @@ import { createMaterial, deleteMaterial, getMaterials, updateMaterial } from "@/
 import FileUpload from "@/app/components/file-upload";
 import RichTextEditor from "@/app/components/rich-text-editor";
 import { Copy, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { getAbsoluteFileUrl } from "@/lib/utils";
 
 type ClassItem = { id: string; name: string };
 type MaterialItem = {
@@ -194,7 +195,7 @@ export default function TeacherMaterialsPage() {
                           {item.fileUrl.toLowerCase().endsWith('.pdf') ? (
                             <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
                               <iframe
-                                src={`${item.fileUrl}#toolbar=0`}
+                                src={`${getAbsoluteFileUrl(item.fileUrl)}#toolbar=0`}
                                 className="h-[400px] w-full"
                                 title="PDF Viewer"
                               />
@@ -202,19 +203,19 @@ export default function TeacherMaterialsPage() {
                           ) : item.fileUrl.toLowerCase().endsWith('.docx') || item.fileUrl.toLowerCase().endsWith('.doc') ? (
                             <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
                               <iframe
-                                src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(item.fileUrl)}`}
+                                src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(getAbsoluteFileUrl(item.fileUrl))}`}
                                 className="h-[400px] w-full"
                                 title="Document Viewer"
                               />
                             </div>
                           ) : (
-                            <a href={item.fileUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-sm text-blue-600 underline dark:text-blue-400">
+                            <a href={getAbsoluteFileUrl(item.fileUrl)} target="_blank" rel="noreferrer" className="mt-1 inline-block text-sm text-blue-600 underline dark:text-blue-400">
                               Buka Lampiran
                             </a>
                           )}
                           <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                             <a
-                              href={item.fileUrl}
+                              href={getAbsoluteFileUrl(item.fileUrl)}
                               target="_blank"
                               rel="noreferrer"
                               className="text-blue-600 underline hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"

@@ -10,6 +10,7 @@ import { getAssignmentsWithMySubmission, submitAssignment } from "@/app/actions/
 import FileUpload from "@/app/components/file-upload";
 import RichTextEditor from "@/app/components/rich-text-editor";
 import { CheckCircle, FileText, Loader2, Lock, Send } from "lucide-react";
+import { getAbsoluteFileUrl } from "@/lib/utils";
 
 type Meeting = {
   id: string;
@@ -244,7 +245,7 @@ export default function StudentMeetingDetailPage() {
                               {m.fileUrl.toLowerCase().endsWith('.pdf') ? (
                                 <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
                                   <iframe
-                                    src={`${m.fileUrl}#toolbar=0`}
+                                    src={`${getAbsoluteFileUrl(m.fileUrl)}#toolbar=0`}
                                     className="h-[600px] w-full"
                                     title="PDF Viewer"
                                   />
@@ -252,14 +253,14 @@ export default function StudentMeetingDetailPage() {
                               ) : m.fileUrl.toLowerCase().endsWith('.docx') || m.fileUrl.toLowerCase().endsWith('.doc') ? (
                                 <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
                                   <iframe
-                                    src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(m.fileUrl)}`}
+                                    src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(getAbsoluteFileUrl(m.fileUrl))}`}
                                     className="h-[600px] w-full"
                                     title="Document Viewer"
                                   />
                                 </div>
                               ) : (
                                 <a
-                                  href={m.fileUrl}
+                                  href={getAbsoluteFileUrl(m.fileUrl)}
                                   target="_blank"
                                   rel="noreferrer"
                                   className="inline-flex items-center gap-2 rounded-lg bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-300 dark:hover:bg-blue-900/40"
@@ -272,7 +273,7 @@ export default function StudentMeetingDetailPage() {
                               <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                                 Tidak bisa melihat pratinjau?{" "}
                                 <a
-                                  href={m.fileUrl}
+                                  href={getAbsoluteFileUrl(m.fileUrl)}
                                   target="_blank"
                                   rel="noreferrer"
                                   className="text-blue-600 underline hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
