@@ -190,9 +190,39 @@ export default function TeacherMaterialsPage() {
                       <p className="text-sm text-slate-500 dark:text-slate-400">{new Date(item.scheduledAt).toLocaleString()} {item.meetingNumber ? `• P${item.meetingNumber}` : ""}</p>
                       {item.content && <p className="mt-1 line-clamp-2 text-sm text-slate-600 dark:text-slate-300">{item.content}</p>}
                       {item.fileUrl && (
-                        <a href={item.fileUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-sm text-blue-600 underline dark:text-blue-400">
-                          Buka Lampiran
-                        </a>
+                        <div className="mt-2">
+                          {item.fileUrl.toLowerCase().endsWith('.pdf') ? (
+                            <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
+                              <iframe
+                                src={`${item.fileUrl}#toolbar=0`}
+                                className="h-[400px] w-full"
+                                title="PDF Viewer"
+                              />
+                            </div>
+                          ) : item.fileUrl.toLowerCase().endsWith('.docx') || item.fileUrl.toLowerCase().endsWith('.doc') ? (
+                            <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
+                              <iframe
+                                src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(item.fileUrl)}`}
+                                className="h-[400px] w-full"
+                                title="Document Viewer"
+                              />
+                            </div>
+                          ) : (
+                            <a href={item.fileUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-sm text-blue-600 underline dark:text-blue-400">
+                              Buka Lampiran
+                            </a>
+                          )}
+                          <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            <a
+                              href={item.fileUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-blue-600 underline hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                            >
+                              Download
+                            </a>
+                          </div>
+                        </div>
                       )}
                     </div>
                     <div className="flex gap-2">

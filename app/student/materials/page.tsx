@@ -124,9 +124,50 @@ export default function StudentMaterialsPage() {
               <div className="rounded-xl bg-slate-50 p-4 dark:bg-slate-900">
                 <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-200">{selectedMaterial.content || "Materi tidak memiliki konten teks."}</p>
                 {selectedMaterial.fileUrl && (
-                  <a href={selectedMaterial.fileUrl} target="_blank" rel="noreferrer" className="mt-3 inline-block text-sm text-blue-600 underline dark:text-blue-400">
-                    Buka Lampiran
-                  </a>
+                  <div className="mt-4">
+                    <div className="mb-2 flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Lampiran</span>
+                    </div>
+                    {selectedMaterial.fileUrl.toLowerCase().endsWith('.pdf') ? (
+                      <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
+                        <iframe
+                          src={`${selectedMaterial.fileUrl}#toolbar=0`}
+                          className="h-[500px] w-full"
+                          title="PDF Viewer"
+                        />
+                      </div>
+                    ) : selectedMaterial.fileUrl.toLowerCase().endsWith('.docx') || selectedMaterial.fileUrl.toLowerCase().endsWith('.doc') ? (
+                      <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
+                        <iframe
+                          src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(selectedMaterial.fileUrl)}`}
+                          className="h-[500px] w-full"
+                          title="Document Viewer"
+                        />
+                      </div>
+                    ) : (
+                      <a
+                        href={selectedMaterial.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 rounded-lg bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-300 dark:hover:bg-blue-900/40"
+                      >
+                        <FileText className="h-4 w-4" />
+                        Buka Lampiran
+                      </a>
+                    )}
+                    <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                      Tidak bisa melihat pratinjau?{" "}
+                      <a
+                        href={selectedMaterial.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-blue-600 underline hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                      >
+                        Download file
+                      </a>
+                    </div>
+                  </div>
                 )}
               </div>
 

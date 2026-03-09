@@ -159,9 +159,39 @@ export default function TeacherMeetingDetailPage() {
                         />
                       )}
                       {m.fileUrl && (
-                        <a href={m.fileUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-blue-600 underline dark:text-blue-400">
-                          Buka Lampiran
-                        </a>
+                        <div className="mt-2">
+                          {m.fileUrl.toLowerCase().endsWith('.pdf') ? (
+                            <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
+                              <iframe
+                                src={`${m.fileUrl}#toolbar=0`}
+                                className="h-[400px] w-full"
+                                title="PDF Viewer"
+                              />
+                            </div>
+                          ) : m.fileUrl.toLowerCase().endsWith('.docx') || m.fileUrl.toLowerCase().endsWith('.doc') ? (
+                            <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
+                              <iframe
+                                src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(m.fileUrl)}`}
+                                className="h-[400px] w-full"
+                                title="Document Viewer"
+                              />
+                            </div>
+                          ) : (
+                            <a href={m.fileUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-blue-600 underline dark:text-blue-400">
+                              Buka Lampiran
+                            </a>
+                          )}
+                          <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            <a
+                              href={m.fileUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-blue-600 underline hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                            >
+                              Download
+                            </a>
+                          </div>
+                        </div>
                       )}
                     </div>
                     <div className="flex gap-1">
