@@ -229,9 +229,10 @@ export default function StudentMeetingDetailPage() {
                       {selectedMaterialId === m.id && (
                         <div className="border-t border-slate-200 px-3 pb-3 pt-2 dark:border-slate-700">
                           {m.content && (
-                            <div className="prose prose-sm max-w-none dark:prose-invert">
-                              <RichTextEditor value={m.content} />
-                            </div>
+                            <div
+                              className="rich-text-content"
+                              dangerouslySetInnerHTML={{ __html: m.content }}
+                            />
                           )}
                           {m.fileUrl && (
                             <div className="mt-3 flex items-center gap-2">
@@ -295,9 +296,10 @@ export default function StudentMeetingDetailPage() {
                           )}
                         </div>
                         {a.instructions && (
-                          <div className="mt-2 rounded-lg bg-slate-50 p-2 text-xs dark:bg-slate-800">
-                            <RichTextEditor value={a.instructions} />
-                          </div>
+                          <div
+                            className="mt-2 rounded-lg bg-slate-50 p-2 text-xs dark:bg-slate-800 rich-text-content"
+                            dangerouslySetInnerHTML={{ __html: a.instructions }}
+                          />
                         )}
                       </div>
 

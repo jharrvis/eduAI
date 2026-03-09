@@ -152,7 +152,12 @@ export default function TeacherMeetingDetailPage() {
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium">{m.title}</p>
-                      {m.content && <RichTextEditor value={m.content} className="mt-1" />}
+                      {m.content && (
+                        <div
+                          className="mt-1 rich-text-content"
+                          dangerouslySetInnerHTML={{ __html: m.content }}
+                        />
+                      )}
                       {m.fileUrl && (
                         <a href={m.fileUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-blue-600 underline dark:text-blue-400">
                           Buka Lampiran
@@ -245,7 +250,12 @@ export default function TeacherMeetingDetailPage() {
                       <div className="flex-1 min-w-0">
                         <p className="font-medium">{a.title}</p>
                         <p className="text-xs text-slate-500 dark:text-slate-400">Tenggat: {new Date(a.dueDate).toLocaleString()}</p>
-                        {a.instructions && <RichTextEditor value={a.instructions} className="mt-1" />}
+                        {a.instructions && (
+                          <div
+                            className="mt-1 rich-text-content"
+                            dangerouslySetInnerHTML={{ __html: a.instructions }}
+                          />
+                        )}
                       </div>
                       <div className="flex gap-1">
                         <button
