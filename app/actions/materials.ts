@@ -2,6 +2,7 @@
 
 import { and, asc, eq, inArray, lte } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { cache } from "react";
 import { requireRole } from "@/app/actions/_auth";
 import { db } from "@/lib/db";
 import { classMeetings, classes, enrollments, materials } from "@/lib/schema";
@@ -30,7 +31,8 @@ function revalidateMaterialPages() {
   revalidatePath("/student/materials");
 }
 
-export async function getMaterials(classId?: string) {
+// Cached version using React cache only (request-scoped)
+const getMaterialsCached = cache(async (classId?: string): Promise<any[]> => {
   const session = await requireRole(["ADMIN", "TEACHER", "STUDENT"]);
   const role = session.user.role as AppRole;
 
@@ -63,6 +65,10 @@ export async function getMaterials(classId?: string) {
     .leftJoin(classMeetings, eq(classMeetings.id, materials.meetingId))
     .where(whereClause)
     .orderBy(asc(materials.scheduledAt));
+});
+
+export async function getMaterials(classId?: string) {
+  return getMaterialsCached(classId);
 }
 
 export async function createMaterial(data: {

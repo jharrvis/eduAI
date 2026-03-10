@@ -7,6 +7,7 @@ const databaseUrl =
   process.env.DATABASE_URL ||
   "postgresql://postgres:postgres@localhost:5432/eduai?sslmode=disable";
 
+// Use neon's built-in connection pooling
 const sql = neon(databaseUrl);
 
 export const db = drizzle(sql, {

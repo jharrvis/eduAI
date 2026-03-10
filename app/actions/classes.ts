@@ -2,6 +2,7 @@
 
 import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { cache } from "react";
 import { requireRole } from "@/app/actions/_auth";
 import { user } from "@/lib/auth-schema";
 import { db } from "@/lib/db";
@@ -24,7 +25,8 @@ function revalidateClassPages() {
   revalidatePath("/student/classes");
 }
 
-async function listClassesByRole(userId: string, role: AppRole): Promise<ClassItem[]> {
+// Cached version using React cache only (request-scoped)
+const listClassesByRoleCached = cache(async (userId: string, role: AppRole): Promise<ClassItem[]> => {
   if (role === "ADMIN") {
     return db.select().from(classes);
   }
@@ -45,19 +47,19 @@ async function listClassesByRole(userId: string, role: AppRole): Promise<ClassIt
         eq(classes.isActive, true),
       ),
     );
-}
+});
 
 export async function getClasses() {
   const session = await requireRole(["ADMIN", "TEACHER", "STUDENT"]);
   const role = session.user.role as AppRole;
-  return listClassesByRole(session.user.id, role);
+  return listClassesByRoleCached(session.user.id, role);
 }
 
 export async function getClassesWithMembers(): Promise<ClassWithMembers[]> {
   const session = await requireRole(["ADMIN", "TEACHER", "STUDENT"]);
   const role = session.user.role as AppRole;
 
-  const classRows = await listClassesByRole(session.user.id, role);
+  const classRows = await listClassesByRoleCached(session.user.id, role);
   if (classRows.length === 0) return [];
 
   const classIds = classRows.map((item) => item.id);
