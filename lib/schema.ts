@@ -1,6 +1,7 @@
 import { relations } from "drizzle-orm";
 import {
   boolean,
+  index,
   integer,
   pgEnum,
   pgTable,
@@ -64,7 +65,10 @@ export const classMeetings = pgTable("class_meetings", {
   endDate: timestamp("end_date", { withTimezone: true }).notNull(),
   durationMinutes: integer("duration_minutes").default(90).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [
+  index("class_meetings_class_id_idx").on(table.classId),
+  index("class_meetings_scheduled_date_idx").on(table.scheduledDate),
+]);
 
 export const enrollments = pgTable("enrollments", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -75,7 +79,13 @@ export const enrollments = pgTable("enrollments", {
     .notNull()
     .references(() => classes.id, { onDelete: "cascade" }),
   roleInClass: roleInClassEnum("role_in_class").notNull(),
-});
+}, (table) => [
+  // Most critical: every permission check and class list query hits these
+  index("enrollments_user_id_idx").on(table.userId),
+  index("enrollments_class_id_idx").on(table.classId),
+  index("enrollments_user_role_idx").on(table.userId, table.roleInClass),
+  index("enrollments_user_class_role_idx").on(table.userId, table.classId, table.roleInClass),
+]);
 
 export const studentProfiles = pgTable("student_profiles", {
   userId: text("user_id")
@@ -102,7 +112,12 @@ export const materials = pgTable("materials", {
   meetingId: uuid("meeting_id").references(() => classMeetings.id, { onDelete: "set null" }),
   scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [
+  index("materials_class_id_idx").on(table.classId),
+  index("materials_meeting_id_idx").on(table.meetingId),
+  // For student date-based locking: WHERE classId IN (...) AND scheduledAt <= now
+  index("materials_class_scheduled_idx").on(table.classId, table.scheduledAt),
+]);
 
 export const assignments = pgTable("assignments", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -112,7 +127,10 @@ export const assignments = pgTable("assignments", {
   instructions: text("instructions"),
   dueDate: timestamp("due_date", { withTimezone: true }).notNull(),
   aiPromptContext: text("ai_prompt_context"),
-});
+}, (table) => [
+  index("assignments_material_id_idx").on(table.materialId),
+  index("assignments_meeting_id_idx").on(table.meetingId),
+]);
 
 export const submissions = pgTable("submissions", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -129,7 +147,12 @@ export const submissions = pgTable("submissions", {
   finalGrade: integer("final_grade"),
   gradedAt: timestamp("graded_at", { withTimezone: true }),
   status: submissionStatusEnum("status").default("PENDING").notNull(),
-});
+}, (table) => [
+  index("submissions_assignment_id_idx").on(table.assignmentId),
+  index("submissions_student_id_idx").on(table.studentId),
+  // Most common pattern: WHERE assignmentId = ? AND studentId = ?
+  index("submissions_assignment_student_idx").on(table.assignmentId, table.studentId),
+]);
 
 export const chatMessages = pgTable("chat_messages", {
   id: uuid("id").defaultRandom().primaryKey(),

@@ -1,6 +1,6 @@
 ﻿"use server";
 
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/app/actions/_auth";
 import { db } from "@/lib/db";
@@ -55,62 +55,53 @@ export async function getAssignmentsWithMySubmission(classId?: string) {
   const classIds = enrolled.map((row) => row.classId);
   if (classIds.length === 0) return [];
 
-  const assignmentRows = await db
-    .select({
-      id: assignments.id,
-      materialId: assignments.materialId,
-      meetingId: assignments.meetingId,
-      title: assignments.title,
-      instructions: assignments.instructions,
-      dueDate: assignments.dueDate,
-      materialClassId: materials.classId,
-      meetingClassId: classMeetings.classId,
-      className: classes.name,
-      meetingTitle: classMeetings.title,
-      meetingNumber: classMeetings.meetingNumber,
-      materialTitle: materials.title,
-    })
-    .from(assignments)
-    .leftJoin(materials, eq(assignments.materialId, materials.id))
-    .leftJoin(classes, eq(materials.classId, classes.id))
-    .leftJoin(classMeetings, eq(assignments.meetingId, classMeetings.id))
-    .orderBy(asc(assignments.dueDate))
-    .then((rows) =>
-      rows
-        .map((row) => ({
-          ...row,
-          classId: row.materialClassId || row.meetingClassId,
-        }))
-        .filter((row) => {
-          if (!row.classId) return false;
-          if (!classIds.includes(row.classId)) return false;
-          if (classId && row.classId !== classId) return false;
-          return true;
-        }),
-    );
+  // Filter in DB using OR — avoids fetching ALL assignments and filtering in JS
+  const targetClassIds = classId ? [classId] : classIds;
+  const classFilter = or(
+    inArray(materials.classId, targetClassIds),
+    inArray(classMeetings.classId, targetClassIds),
+  );
 
-  if (assignmentRows.length === 0) return [];
+  const [assignmentRows, submissionRows] = await Promise.all([
+    db
+      .select({
+        id: assignments.id,
+        materialId: assignments.materialId,
+        meetingId: assignments.meetingId,
+        title: assignments.title,
+        instructions: assignments.instructions,
+        dueDate: assignments.dueDate,
+        materialClassId: materials.classId,
+        meetingClassId: classMeetings.classId,
+        className: classes.name,
+        meetingTitle: classMeetings.title,
+        meetingNumber: classMeetings.meetingNumber,
+        materialTitle: materials.title,
+      })
+      .from(assignments)
+      .leftJoin(materials, eq(assignments.materialId, materials.id))
+      .leftJoin(classes, eq(materials.classId, classes.id))
+      .leftJoin(classMeetings, eq(assignments.meetingId, classMeetings.id))
+      .where(classFilter)
+      .orderBy(asc(assignments.dueDate)),
+    db
+      .select()
+      .from(submissions)
+      .where(eq(submissions.studentId, session.user.id)),
+  ]);
 
-  const submissionRows = await db
-    .select()
-    .from(submissions)
-    .where(
-      and(
-        eq(submissions.studentId, session.user.id),
-        inArray(
-          submissions.assignmentId,
-          assignmentRows.map((item) => item.id),
-        ),
-      ),
-    );
+  const submissionMap = new Map(submissionRows.map((s) => [s.assignmentId, s]));
 
-  return assignmentRows.map((item) => {
-    const mine = submissionRows.find((sub) => sub.assignmentId === item.id) || null;
-    return {
+  return assignmentRows
+    .map((row) => ({
+      ...row,
+      classId: row.materialClassId || row.meetingClassId,
+    }))
+    .filter((row) => row.classId && classIds.includes(row.classId))
+    .map((item) => ({
       ...item,
-      mySubmission: mine,
-    };
-  });
+      mySubmission: submissionMap.get(item.id) ?? null,
+    }));
 }
 
 export async function submitAssignment(
@@ -119,16 +110,21 @@ export async function submitAssignment(
 ) {
   const session = await requireRole(["STUDENT"]);
 
-  const assignmentRow = await db
-    .select({
-      materialClassId: materials.classId,
-      meetingClassId: classMeetings.classId,
-    })
-    .from(assignments)
-    .leftJoin(materials, eq(assignments.materialId, materials.id))
-    .leftJoin(classMeetings, eq(assignments.meetingId, classMeetings.id))
-    .where(eq(assignments.id, assignmentId))
-    .limit(1);
+  // Single query: get assignment class + check enrollment + get existing submission in parallel
+  const [assignmentRow, existing] = await Promise.all([
+    db
+      .select({ materialClassId: materials.classId, meetingClassId: classMeetings.classId })
+      .from(assignments)
+      .leftJoin(materials, eq(assignments.materialId, materials.id))
+      .leftJoin(classMeetings, eq(assignments.meetingId, classMeetings.id))
+      .where(eq(assignments.id, assignmentId))
+      .limit(1),
+    db
+      .select({ id: submissions.id })
+      .from(submissions)
+      .where(and(eq(submissions.assignmentId, assignmentId), eq(submissions.studentId, session.user.id)))
+      .limit(1),
+  ]);
 
   const classId = assignmentRow[0]?.materialClassId || assignmentRow[0]?.meetingClassId;
   if (!classId) throw new Error("Assignment tidak valid.");
@@ -145,12 +141,6 @@ export async function submitAssignment(
     )
     .limit(1);
   if (!isEnrolled[0]) throw new Error("FORBIDDEN");
-
-  const existing = await db
-    .select({ id: submissions.id })
-    .from(submissions)
-    .where(and(eq(submissions.assignmentId, assignmentId), eq(submissions.studentId, session.user.id)))
-    .limit(1);
 
   if (existing[0]) {
     await db

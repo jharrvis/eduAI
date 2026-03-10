@@ -93,22 +93,20 @@ export async function createMaterial(data: {
   }
 
   if (session.user.role === "TEACHER") {
-    for (const classId of targetClassIds) {
-      const teaching = await db
-        .select({ id: enrollments.id })
-        .from(enrollments)
-        .where(
-          and(
-            eq(enrollments.userId, session.user.id),
-            eq(enrollments.classId, classId),
-            eq(enrollments.roleInClass, "TEACHER"),
-          ),
-        )
-        .limit(1);
-
-      if (!teaching[0]) {
-        throw new Error("FORBIDDEN");
-      }
+    // Single batch query instead of N+1 per classId
+    const teaching = await db
+      .select({ classId: enrollments.classId })
+      .from(enrollments)
+      .where(
+        and(
+          eq(enrollments.userId, session.user.id),
+          inArray(enrollments.classId, targetClassIds),
+          eq(enrollments.roleInClass, "TEACHER"),
+        ),
+      );
+    const allowedClassIds = new Set(teaching.map((r) => r.classId));
+    if (targetClassIds.some((id) => !allowedClassIds.has(id))) {
+      throw new Error("FORBIDDEN");
     }
   }
 

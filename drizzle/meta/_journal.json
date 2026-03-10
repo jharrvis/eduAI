@@ -64,6 +64,13 @@
       "when": 1772977630075,
       "tag": "0008_daily_energizer",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1773110301101,
+      "tag": "0009_open_longshot",
+      "breakpoints": true
     }
   ]
 }
